@@ -6,6 +6,12 @@ WORKDIR /workspace
 
 # Copy module files first for layer caching
 COPY libs/go-common/go.mod libs/go-common/go.sum libs/go-common/
+COPY providers/llm/claude/go.mod providers/llm/claude/
+COPY providers/llm/openai/go.mod providers/llm/openai/
+COPY providers/llm/ollama/go.mod providers/llm/ollama/go.sum providers/llm/ollama/
+COPY providers/llm/vertex-ai/go.mod providers/llm/vertex-ai/
+COPY providers/llm/bedrock/go.mod providers/llm/bedrock/
+COPY providers/warehouse/bigquery/go.mod providers/warehouse/bigquery/go.sum providers/warehouse/bigquery/
 COPY domain-packs/gaming/go/go.mod domain-packs/gaming/go/
 COPY services/api/go.mod services/api/go.sum services/api/
 
@@ -15,6 +21,7 @@ RUN go mod download
 # Copy source
 WORKDIR /workspace
 COPY libs/ libs/
+COPY providers/ providers/
 COPY domain-packs/ domain-packs/
 COPY services/api/ services/api/
 
