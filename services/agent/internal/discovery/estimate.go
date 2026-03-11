@@ -27,6 +27,20 @@ func (o *Orchestrator) EstimateCost(ctx context.Context, opts EstimateOptions) (
 
 	applog.Info("Estimating discovery cost")
 
+	// Initialize schema discovery if not already set (estimate bypasses RunDiscovery)
+	if o.schemaDiscovery == nil {
+		filterClause := ""
+		if o.filterField != "" && o.filterValue != "" {
+			filterClause = fmt.Sprintf("WHERE %s = '%s'", o.filterField, o.filterValue)
+		}
+		o.schemaDiscovery = NewSchemaDiscovery(SchemaDiscoveryOptions{
+			Warehouse: o.warehouse,
+			ProjectID: o.projectID,
+			Datasets:  o.datasets,
+			Filter:    filterClause,
+		})
+	}
+
 	// Phase 1: Load project context (for schema cache)
 	projectCtx, err := o.loadProjectContext(ctx)
 	if err != nil {
