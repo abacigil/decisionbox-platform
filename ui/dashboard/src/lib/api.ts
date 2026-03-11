@@ -271,6 +271,17 @@ export interface RunStep {
   error: string;
 }
 
+export interface Feedback {
+  id: string;
+  project_id: string;
+  discovery_id: string;
+  target_type: 'insight' | 'recommendation';
+  target_id: string;
+  rating: 'like' | 'dislike';
+  comment?: string;
+  created_at: string;
+}
+
 // --- API Functions ---
 
 export const api = {
@@ -322,4 +333,12 @@ export const api = {
     request<DiscoveryResult>(`/api/v1/projects/${projectId}/discoveries/${date}`),
   getProjectStatus: (projectId: string) =>
     request<ProjectStatus>(`/api/v1/projects/${projectId}/status`),
+
+  // Feedback
+  submitFeedback: (discoveryId: string, data: { project_id?: string; target_type: string; target_id: string; rating: string; comment?: string }) =>
+    request<Feedback>(`/api/v1/discoveries/${discoveryId}/feedback`, { method: 'POST', body: JSON.stringify(data) }),
+  listFeedback: (discoveryId: string) =>
+    request<Feedback[]>(`/api/v1/discoveries/${discoveryId}/feedback`),
+  deleteFeedback: (feedbackId: string) =>
+    request<{ status: string }>(`/api/v1/feedback/${feedbackId}`, { method: 'DELETE' }),
 };

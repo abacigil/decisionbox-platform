@@ -10,7 +10,8 @@ import {
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import Shell from '@/components/layout/AppShell';
-import { api, DiscoveryResult, Insight } from '@/lib/api';
+import FeedbackButtons from '@/components/common/FeedbackButtons';
+import { api, DiscoveryResult, Feedback, Insight } from '@/lib/api';
 
 const severityColor: Record<string, string> = {
   critical: 'red', high: 'orange', medium: 'yellow', low: 'gray',
@@ -20,16 +21,22 @@ export default function InsightDetailPage() {
   const { id, runId, insightId } = useParams<{ id: string; runId: string; insightId: string }>();
   const [insight, setInsight] = useState<Insight | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getDiscoveryById(runId)
-      .then((disc) => {
+    Promise.all([
+      api.getDiscoveryById(runId).then((disc) => {
         setDiscovery(disc);
         const insights = disc?.insights || [];
         const found = insights.find((i) => i.id === insightId) || insights[parseInt(insightId)] || null;
         setInsight(found);
-      })
+      }),
+      api.listFeedback(runId).then((fb) => {
+        const match = (fb || []).find((f) => f.target_type === 'insight' && f.target_id === insightId);
+        if (match) setFeedback(match);
+      }).catch(() => {}),
+    ])
       .catch(() => null)
       .finally(() => setLoading(false));
   }, [runId, insightId]);
@@ -72,6 +79,8 @@ export default function InsightDetailPage() {
             {insight.affected_count > 0 && (
               <Badge variant="outline">{insight.affected_count.toLocaleString()} affected</Badge>
             )}
+            <FeedbackButtons discoveryId={runId} targetType="insight" targetId={insightId}
+              feedback={feedback} onUpdate={setFeedback} />
           </Group>
         </div>
 

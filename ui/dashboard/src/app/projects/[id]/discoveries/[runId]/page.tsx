@@ -11,7 +11,8 @@ import {
 } from '@tabler/icons-react';
 import Link from 'next/link';
 import Shell from '@/components/layout/AppShell';
-import { api, DiscoveryResult, Insight, Recommendation, ExplorationStep, AnalysisLogStep } from '@/lib/api';
+import FeedbackButtons from '@/components/common/FeedbackButtons';
+import { api, DiscoveryResult, Feedback, Insight, Recommendation, ExplorationStep, AnalysisLogStep } from '@/lib/api';
 
 const severityColor: Record<string, string> = {
   critical: 'red', high: 'orange', medium: 'yellow', low: 'gray',
@@ -23,6 +24,7 @@ const severityOrder: Record<string, number> = {
 export default function DiscoveryDetailPage() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, Feedback>>({});
   const [loading, setLoading] = useState(true);
 
   // Filters & sorting
@@ -31,11 +33,27 @@ export default function DiscoveryDetailPage() {
   const [sortBy, setSortBy] = useState<string>('severity');
 
   useEffect(() => {
-    api.getDiscoveryById(runId)
-      .then(setDiscovery)
+    Promise.all([
+      api.getDiscoveryById(runId).then(setDiscovery),
+      api.listFeedback(runId).then((fb) => {
+        const map: Record<string, Feedback> = {};
+        (fb || []).forEach((f) => { map[`${f.target_type}:${f.target_id}`] = f; });
+        setFeedbackMap(map);
+      }).catch(() => {}),
+    ])
       .catch(() => null)
       .finally(() => setLoading(false));
   }, [runId]);
+
+  const handleFeedbackUpdate = (targetType: string, targetId: string, fb: Feedback | null) => {
+    const key = `${targetType}:${targetId}`;
+    setFeedbackMap((prev) => {
+      const next = { ...prev };
+      if (fb) next[key] = fb;
+      else delete next[key];
+      return next;
+    });
+  };
 
   if (loading) return <Shell><Loader /></Shell>;
   if (!discovery) return <Shell><Text>Discovery not found</Text></Shell>;
@@ -208,6 +226,10 @@ export default function DiscoveryDetailPage() {
                       {insight.affected_count > 0 && (
                         <Text size="xs" c="dimmed">{insight.affected_count.toLocaleString()} affected</Text>
                       )}
+                      <FeedbackButtons discoveryId={runId} targetType="insight"
+                        targetId={String(insight.id || idx)}
+                        feedback={feedbackMap[`insight:${insight.id || idx}`]}
+                        onUpdate={(fb) => handleFeedbackUpdate('insight', String(insight.id || idx), fb)} />
                     </Group>
                   </Group>
                   <Text size="xs" c="dimmed" lineClamp={2}>{insight.description}</Text>
@@ -234,7 +256,9 @@ export default function DiscoveryDetailPage() {
               {[...discovery.recommendations]
                 .sort((a, b) => a.priority - b.priority)
                 .map((rec, idx) => (
-                  <RecommendationCard key={idx} rec={rec} />
+                  <RecommendationCard key={idx} rec={rec} discoveryId={runId} idx={idx}
+                    feedback={feedbackMap[`recommendation:${idx}`]}
+                    onFeedbackUpdate={(fb) => handleFeedbackUpdate('recommendation', String(idx), fb)} />
                 ))}
             </Stack>
           </>
@@ -365,14 +389,21 @@ export default function DiscoveryDetailPage() {
   );
 }
 
-function RecommendationCard({ rec }: { rec: Recommendation }) {
+function RecommendationCard({ rec, discoveryId, idx, feedback, onFeedbackUpdate }: {
+  rec: Recommendation; discoveryId: string; idx: number;
+  feedback?: Feedback | null; onFeedbackUpdate?: (fb: Feedback | null) => void;
+}) {
   const priorityColor = rec.priority <= 1 ? 'red' : rec.priority <= 2 ? 'orange' : 'blue';
   return (
     <Card withBorder p="md" radius="md"
       style={{ borderLeft: `3px solid var(--mantine-color-${priorityColor}-6)` }}>
       <Group justify="space-between" mb={4}>
         <Text size="sm" fw={600}>{rec.title}</Text>
-        <Badge color={priorityColor} variant="light" size="xs">P{rec.priority}</Badge>
+        <Group gap="xs">
+          <Badge color={priorityColor} variant="light" size="xs">P{rec.priority}</Badge>
+          <FeedbackButtons discoveryId={discoveryId} targetType="recommendation"
+            targetId={String(idx)} feedback={feedback} onUpdate={onFeedbackUpdate} />
+        </Group>
       </Group>
       <Text size="xs" c="dimmed" mb="sm">{rec.description}</Text>
       {rec.expected_impact && (

@@ -742,6 +742,148 @@ func TestInteg_CancelRun_NotFound(t *testing.T) {
 	}
 }
 
+// --- Feedback ---
+
+func TestInteg_Feedback_CRUD(t *testing.T) {
+	// Create a project first
+	resp := doRequest(t, "POST", "/api/v1/projects", map[string]interface{}{
+		"name": "feedback-test", "domain": "gaming", "category": "match3",
+		"warehouse": map[string]interface{}{"provider": "bigquery", "project_id": "test", "datasets": []string{"ds"}},
+		"llm":       map[string]interface{}{"provider": "claude", "model": "test"},
+	})
+	r := decodeResponse(t, resp)
+	projectID := r.Data.(map[string]interface{})["id"].(string)
+
+	// Use a fake discovery ID
+	discoveryID := "feed-disc-test-123"
+
+	// 1. List feedback (empty)
+	resp = doRequest(t, "GET", "/api/v1/discoveries/"+discoveryID+"/feedback", nil)
+	if resp.StatusCode != 200 {
+		t.Fatalf("list status = %d", resp.StatusCode)
+	}
+	r = decodeResponse(t, resp)
+	items := r.Data.([]interface{})
+	if len(items) != 0 {
+		t.Errorf("expected empty feedback, got %d", len(items))
+	}
+
+	// 2. Submit a like
+	resp = doRequest(t, "POST", "/api/v1/discoveries/"+discoveryID+"/feedback", map[string]interface{}{
+		"project_id":  projectID,
+		"target_type": "insight",
+		"target_id":   "0",
+		"rating":      "like",
+	})
+	if resp.StatusCode != 200 {
+		t.Fatalf("submit like status = %d", resp.StatusCode)
+	}
+	r = decodeResponse(t, resp)
+	fb := r.Data.(map[string]interface{})
+	feedbackID := fb["id"].(string)
+	if fb["rating"] != "like" {
+		t.Errorf("rating = %v, want like", fb["rating"])
+	}
+	if fb["target_type"] != "insight" {
+		t.Errorf("target_type = %v", fb["target_type"])
+	}
+
+	// 3. List feedback (1 item)
+	resp = doRequest(t, "GET", "/api/v1/discoveries/"+discoveryID+"/feedback", nil)
+	r = decodeResponse(t, resp)
+	items = r.Data.([]interface{})
+	if len(items) != 1 {
+		t.Errorf("expected 1 feedback, got %d", len(items))
+	}
+
+	// 4. Upsert — change to dislike with comment
+	resp = doRequest(t, "POST", "/api/v1/discoveries/"+discoveryID+"/feedback", map[string]interface{}{
+		"project_id":  projectID,
+		"target_type": "insight",
+		"target_id":   "0",
+		"rating":      "dislike",
+		"comment":     "not actionable",
+	})
+	if resp.StatusCode != 200 {
+		t.Fatalf("upsert status = %d", resp.StatusCode)
+	}
+	r = decodeResponse(t, resp)
+	fb = r.Data.(map[string]interface{})
+	if fb["rating"] != "dislike" {
+		t.Errorf("rating after upsert = %v, want dislike", fb["rating"])
+	}
+	if fb["comment"] != "not actionable" {
+		t.Errorf("comment = %v", fb["comment"])
+	}
+
+	// 5. Still 1 item (upsert, not duplicate)
+	resp = doRequest(t, "GET", "/api/v1/discoveries/"+discoveryID+"/feedback", nil)
+	r = decodeResponse(t, resp)
+	items = r.Data.([]interface{})
+	if len(items) != 1 {
+		t.Errorf("expected 1 feedback after upsert, got %d", len(items))
+	}
+
+	// 6. Add recommendation feedback
+	resp = doRequest(t, "POST", "/api/v1/discoveries/"+discoveryID+"/feedback", map[string]interface{}{
+		"project_id":  projectID,
+		"target_type": "recommendation",
+		"target_id":   "2",
+		"rating":      "like",
+	})
+	if resp.StatusCode != 200 {
+		t.Fatalf("submit rec feedback status = %d", resp.StatusCode)
+	}
+
+	// 7. Now 2 items
+	resp = doRequest(t, "GET", "/api/v1/discoveries/"+discoveryID+"/feedback", nil)
+	r = decodeResponse(t, resp)
+	items = r.Data.([]interface{})
+	if len(items) != 2 {
+		t.Errorf("expected 2 feedback, got %d", len(items))
+	}
+
+	// 8. Delete the first feedback
+	resp = doRequest(t, "DELETE", "/api/v1/feedback/"+feedbackID, nil)
+	if resp.StatusCode != 200 {
+		t.Errorf("delete status = %d", resp.StatusCode)
+	}
+
+	// 9. Back to 1
+	resp = doRequest(t, "GET", "/api/v1/discoveries/"+discoveryID+"/feedback", nil)
+	r = decodeResponse(t, resp)
+	items = r.Data.([]interface{})
+	if len(items) != 1 {
+		t.Errorf("expected 1 feedback after delete, got %d", len(items))
+	}
+}
+
+func TestInteg_Feedback_Validation(t *testing.T) {
+	// Invalid rating
+	resp := doRequest(t, "POST", "/api/v1/discoveries/test-run/feedback", map[string]interface{}{
+		"target_type": "insight", "target_id": "0", "rating": "meh",
+	})
+	if resp.StatusCode != 400 {
+		t.Errorf("invalid rating: status = %d, want 400", resp.StatusCode)
+	}
+
+	// Invalid target type
+	resp = doRequest(t, "POST", "/api/v1/discoveries/test-run/feedback", map[string]interface{}{
+		"target_type": "sql_query", "target_id": "0", "rating": "like",
+	})
+	if resp.StatusCode != 400 {
+		t.Errorf("invalid target_type: status = %d, want 400", resp.StatusCode)
+	}
+
+	// Missing fields
+	resp = doRequest(t, "POST", "/api/v1/discoveries/test-run/feedback", map[string]interface{}{
+		"rating": "like",
+	})
+	if resp.StatusCode != 400 {
+		t.Errorf("missing fields: status = %d, want 400", resp.StatusCode)
+	}
+}
+
 // --- CORS ---
 
 func TestInteg_CORS(t *testing.T) {

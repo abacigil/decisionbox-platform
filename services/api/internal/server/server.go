@@ -18,6 +18,7 @@ func New(db *database.DB) http.Handler {
 	projectRepo := database.NewProjectRepository(db)
 	discoveryRepo := database.NewDiscoveryRepository(db)
 	runRepo := database.NewRunRepository(db)
+	feedbackRepo := database.NewFeedbackRepository(db)
 
 	// Clean up stale runs from previous container lifecycle
 	cleaned, err := runRepo.CleanupStaleRuns(context.Background())
@@ -35,6 +36,7 @@ func New(db *database.DB) http.Handler {
 	domains := handler.NewDomainsHandler()
 	projects := handler.NewProjectsHandler(projectRepo)
 	discoveries := handler.NewDiscoveriesHandler(discoveryRepo, projectRepo, runRepo, tracker)
+	feedback := handler.NewFeedbackHandler(feedbackRepo)
 
 	// Health
 	mux.HandleFunc("GET /api/v1/health", handler.HealthCheck)
@@ -73,6 +75,11 @@ func New(db *database.DB) http.Handler {
 	// Runs (live status + cancel)
 	mux.HandleFunc("GET /api/v1/runs/{runId}", discoveries.GetRun)
 	mux.HandleFunc("DELETE /api/v1/runs/{runId}", discoveries.CancelRun)
+
+	// Feedback
+	mux.HandleFunc("POST /api/v1/discoveries/{runId}/feedback", feedback.Submit)
+	mux.HandleFunc("GET /api/v1/discoveries/{runId}/feedback", feedback.List)
+	mux.HandleFunc("DELETE /api/v1/feedback/{id}", feedback.Delete)
 
 	// CORS middleware for dashboard
 	return corsMiddleware(mux)
