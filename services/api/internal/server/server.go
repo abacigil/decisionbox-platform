@@ -67,6 +67,9 @@ func New(db *database.DB) http.Handler {
 	mux.HandleFunc("GET /api/v1/projects/{id}/discoveries/{date}", discoveries.GetByDate)
 	mux.HandleFunc("GET /api/v1/projects/{id}/status", discoveries.GetStatus)
 
+	// Single discovery by ID
+	mux.HandleFunc("GET /api/v1/discoveries/{id}", discoveries.GetDiscoveryByID)
+
 	// Runs (live status + cancel)
 	mux.HandleFunc("GET /api/v1/runs/{runId}", discoveries.GetRun)
 	mux.HandleFunc("DELETE /api/v1/runs/{runId}", discoveries.CancelRun)

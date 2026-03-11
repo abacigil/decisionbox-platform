@@ -53,6 +53,24 @@ func (h *DiscoveriesHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, results)
 }
 
+// GetDiscoveryByID returns a specific discovery by its ID.
+// GET /api/v1/discoveries/{id}
+func (h *DiscoveriesHandler) GetDiscoveryByID(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	result, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get discovery: "+err.Error())
+		return
+	}
+	if result == nil {
+		writeError(w, http.StatusNotFound, "discovery not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 // GetLatest returns the most recent discovery for a project.
 // GET /api/v1/projects/{id}/discoveries/latest
 func (h *DiscoveriesHandler) GetLatest(w http.ResponseWriter, r *http.Request) {

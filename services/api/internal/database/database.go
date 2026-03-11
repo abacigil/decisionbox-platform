@@ -158,6 +158,22 @@ func NewDiscoveryRepository(db *DB) *DiscoveryRepository {
 	return &DiscoveryRepository{col: db.Collection("discoveries")}
 }
 
+func (r *DiscoveryRepository) GetByID(ctx context.Context, id string) (*models.DiscoveryResult, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, nil
+	}
+
+	var result models.DiscoveryResult
+	if err := r.col.FindOne(ctx, bson.M{"_id": oid}).Decode(&result); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (r *DiscoveryRepository) GetLatest(ctx context.Context, projectID string) (*models.DiscoveryResult, error) {
 	filter := bson.M{"project_id": projectID}
 	opts := options.FindOne().SetSort(bson.D{{Key: "discovery_date", Value: -1}})

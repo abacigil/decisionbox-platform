@@ -276,6 +276,8 @@ export const api = {
     request<DiscoveryResult[]>(`/api/v1/projects/${projectId}/discoveries`),
   getLatestDiscovery: (projectId: string) =>
     request<DiscoveryResult>(`/api/v1/projects/${projectId}/discoveries/latest`),
+  getDiscoveryById: (discoveryId: string) =>
+    request<DiscoveryResult>(`/api/v1/discoveries/${discoveryId}`),
   getDiscoveryByDate: (projectId: string, date: string) =>
     request<DiscoveryResult>(`/api/v1/projects/${projectId}/discoveries/${date}`),
   getProjectStatus: (projectId: string) =>
