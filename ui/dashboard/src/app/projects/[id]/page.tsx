@@ -93,8 +93,6 @@ export default function ProjectPage() {
       setEstimate(est);
     } catch (e: unknown) {
       notifications.show({ title: 'Estimation failed', message: (e as Error).message, color: 'orange' });
-      // Fall through — let them run without estimate
-      handleTrigger(areas);
     } finally {
       setEstimating(false);
     }

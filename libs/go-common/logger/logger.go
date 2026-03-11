@@ -41,7 +41,7 @@ func New(service, level string) *Logger {
 		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
-	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), lvl)
+	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stderr), lvl)
 	l := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	l = l.With(zap.String("service", service))
 
