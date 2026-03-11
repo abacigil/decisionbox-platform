@@ -53,9 +53,15 @@
           },
           "price_usd": { "type": "number", "title": "Price (USD)" },
           "contents": {
-            "type": "object",
+            "type": "array",
             "title": "Contents",
-            "additionalProperties": { "type": "number" }
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": { "type": "string", "title": "Item" },
+                "count": { "type": "integer", "title": "Count" }
+              }
+            }
           }
         }
       }

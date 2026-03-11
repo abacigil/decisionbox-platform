@@ -294,8 +294,7 @@ function SchemaField({ fieldKey, fieldSchema, value, onChange }: {
 }) {
   const fs = fieldSchema as {
     type?: string; title?: string; description?: string;
-    enum?: string[]; items?: { type?: string; enum?: string[] };
-    additionalProperties?: { type?: string };
+    enum?: string[]; items?: { type?: string; enum?: string[]; properties?: Record<string, unknown> };
   };
 
   if (fs.type === 'string' && fs.enum) {
@@ -320,14 +319,13 @@ function SchemaField({ fieldKey, fieldSchema, value, onChange }: {
         onChange={(e) => onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))} />
     );
   }
-  if (fs.type === 'object' && fs.additionalProperties) {
-    // Key-value map (e.g., IAP contents: { coins: 100, gems: 5 })
-    const obj = (value || {}) as Record<string, unknown>;
-    const jsonStr = Object.keys(obj).length > 0 ? JSON.stringify(obj) : '';
+  if (fs.type === 'array' && fs.items?.type === 'object') {
+    // Nested array of objects (e.g., IAP contents: [{item: "coins", count: 100}])
+    const itemSchema = fs.items as { properties?: Record<string, unknown> };
+    const items = (Array.isArray(value) ? value : []) as Record<string, unknown>[];
     return (
-      <TextInput label={fs.title || fieldKey} description={fs.description || 'JSON object, e.g. {"coins": 100}'}
-        value={jsonStr} size="xs" styles={{ input: { fontFamily: 'monospace', fontSize: 11 } }}
-        onChange={(e) => { try { onChange(JSON.parse(e.target.value || '{}')); } catch { /* typing */ } }} />
+      <InlineArrayEditor title={fs.title || fieldKey} itemSchema={itemSchema}
+        items={items} onChange={onChange} />
     );
   }
   if (fs.type === 'boolean') {
@@ -397,6 +395,56 @@ function ArrayOfObjectsEditor({ title, itemSchema, items, onChange }: {
             No items. Click + to add.
           </Text>
         )}
+      </Stack>
+    </div>
+  );
+}
+
+// Compact inline rows for nested array-of-objects (e.g., IAP contents: [{item, count}])
+function InlineArrayEditor({ title, itemSchema, items, onChange }: {
+  title: string;
+  itemSchema: { properties?: Record<string, unknown> };
+  items: Record<string, unknown>[];
+  onChange: (items: unknown) => void;
+}) {
+  const fields = itemSchema.properties || {};
+  const addItem = () => onChange([...items, {}]);
+  const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+  const updateItem = (idx: number, field: string, value: unknown) => {
+    const updated = [...items];
+    updated[idx] = { ...updated[idx], [field]: value };
+    onChange(updated);
+  };
+
+  return (
+    <div>
+      <Group gap={4} mb={4}>
+        <Text size="xs" fw={600}>{title}</Text>
+        <ActionIcon variant="subtle" size="xs" onClick={addItem}>
+          <IconPlus size={12} />
+        </ActionIcon>
+      </Group>
+      <Stack gap={4}>
+        {items.map((item, idx) => (
+          <Group key={idx} gap={4} wrap="nowrap">
+            {Object.entries(fields).map(([fk, fs]) => {
+              const f = fs as { type?: string; title?: string };
+              if (f.type === 'integer' || f.type === 'number') {
+                return (
+                  <NumberInput key={fk} placeholder={f.title || fk} size="xs"
+                    value={(item[fk] as number) ?? ''} style={{ flex: 1 }}
+                    onChange={(v) => updateItem(idx, fk, v)} />
+                );
+              }
+              return (
+                <TextInput key={fk} placeholder={f.title || fk} size="xs"
+                  value={(item[fk] as string) || ''} style={{ flex: 2 }}
+                  onChange={(e) => updateItem(idx, fk, e.target.value)} />
+              );
+            })}
+            <CloseButton size="xs" onClick={() => removeItem(idx)} />
+          </Group>
+        ))}
       </Stack>
     </div>
   );
