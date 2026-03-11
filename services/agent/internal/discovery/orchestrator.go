@@ -101,15 +101,7 @@ func NewOrchestrator(opts OrchestratorOptions) *Orchestrator {
 		})
 	}
 
-	var insightVal *validation.InsightValidator
-	if opts.Warehouse != nil && opts.AIClient != nil {
-		insightVal = validation.NewInsightValidator(validation.InsightValidatorOptions{
-			AIClient:  opts.AIClient,
-			Warehouse: opts.Warehouse,
-			Dataset:   opts.Warehouse.GetDataset(),
-			Filter:    filterClause,
-		})
-	}
+	// InsightValidator created in RunDiscovery where QueryExecutor is available
 
 	// Status reporter for live updates
 	statusReporter := NewStatusReporter(opts.RunRepo, opts.RunID)
@@ -124,7 +116,6 @@ func NewOrchestrator(opts OrchestratorOptions) *Orchestrator {
 		debugLogger:        debugLogger,
 		statusReporter:     statusReporter,
 		userCountValidator: ucValidator,
-		insightValidator:   insightVal,
 		projectID:          opts.ProjectID,
 		domain:             opts.Domain,
 		category:           opts.Category,
@@ -182,6 +173,17 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 		FilterField: o.filterField,
 		FilterValue: o.filterValue,
 	})
+
+	// Initialize insight validator with self-healing executor
+	if o.aiClient != nil {
+		o.insightValidator = validation.NewInsightValidator(validation.InsightValidatorOptions{
+			AIClient:  o.aiClient,
+			Warehouse: o.warehouse,
+			Executor:  &executorAdapter{executor: executor},
+			Dataset:   datasetsStr,
+			Filter:    filterClause,
+		})
+	}
 
 	// Initialize schema discovery for all datasets
 	o.schemaDiscovery = NewSchemaDiscovery(SchemaDiscoveryOptions{
@@ -712,6 +714,19 @@ func (o *Orchestrator) filterQueriesByKeywords(steps []models.ExplorationStep, k
 		}
 	}
 	return filtered
+}
+
+// executorAdapter adapts queryexec.QueryExecutor to validation.SelfHealingExecutor.
+type executorAdapter struct {
+	executor *queryexec.QueryExecutor
+}
+
+func (a *executorAdapter) Execute(ctx context.Context, query string, purpose string) ([]map[string]interface{}, error) {
+	result, err := a.executor.Execute(ctx, query, purpose)
+	if err != nil {
+		return nil, err
+	}
+	return result.Data, nil
 }
 
 func cleanJSONResponse(response string) string {

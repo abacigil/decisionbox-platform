@@ -15,18 +15,25 @@ import (
 
 // InsightValidator verifies LLM-generated insights by querying the warehouse.
 // For each insight, it asks the LLM to generate a verification query,
-// runs it, and compares the result with the claimed numbers.
+// runs it (with self-healing SQL fix), and compares the result with the claimed numbers.
 type InsightValidator struct {
 	aiClient  *ai.Client
 	warehouse gowarehouse.Provider
+	executor  SelfHealingExecutor
 	dataset   string
 	filter    string
+}
+
+// SelfHealingExecutor executes queries with automatic SQL fix + retry.
+type SelfHealingExecutor interface {
+	Execute(ctx context.Context, query string, purpose string) (rows []map[string]interface{}, err error)
 }
 
 // InsightValidatorOptions configures the insight validator.
 type InsightValidatorOptions struct {
 	AIClient  *ai.Client
 	Warehouse gowarehouse.Provider
+	Executor  SelfHealingExecutor // if set, uses self-healing query execution
 	Dataset   string
 	Filter    string
 }
@@ -36,6 +43,7 @@ func NewInsightValidator(opts InsightValidatorOptions) *InsightValidator {
 	return &InsightValidator{
 		aiClient:  opts.AIClient,
 		warehouse: opts.Warehouse,
+		executor:  opts.Executor,
 		dataset:   opts.Dataset,
 		filter:    opts.Filter,
 	}
@@ -118,17 +126,27 @@ func (v *InsightValidator) validateSingleInsight(
 
 	vr.Query = verificationQuery
 
-	// Run the verification query against the warehouse
-	queryResult, err := v.warehouse.Query(ctx, verificationQuery, nil)
-	if err != nil {
-		vr.Status = "error"
-		vr.QueryError = err.Error()
-		vr.Reasoning = fmt.Sprintf("Verification query failed: %s", err.Error())
-		return vr
+	// Run the verification query with self-healing (retry + SQL fix)
+	var verifiedCount int
+	if v.executor != nil {
+		rows, err := v.executor.Execute(ctx, verificationQuery, "validate insight: "+insight.Name)
+		if err != nil {
+			vr.Status = "error"
+			vr.QueryError = err.Error()
+			vr.Reasoning = fmt.Sprintf("Verification query failed after retries: %s", err.Error())
+			return vr
+		}
+		verifiedCount = extractCountFromRows(rows)
+	} else {
+		queryResult, err := v.warehouse.Query(ctx, verificationQuery, nil)
+		if err != nil {
+			vr.Status = "error"
+			vr.QueryError = err.Error()
+			vr.Reasoning = fmt.Sprintf("Verification query failed: %s", err.Error())
+			return vr
+		}
+		verifiedCount = v.extractCount(queryResult)
 	}
-
-	// Extract the count from the query result
-	verifiedCount := v.extractCount(queryResult)
 	vr.VerifiedCount = verifiedCount
 
 	// Compare claimed vs verified
@@ -190,6 +208,7 @@ Generate a single SQL query that:
 2. Uses COUNT(DISTINCT user_id) for user counts
 3. Uses FULLY QUALIFIED table names: `+"`dataset.table`"+`
 4. Includes the filter clause if provided
+5. ALWAYS alias the result as "count": SELECT COUNT(...) AS count
 
 Return ONLY the raw SQL query, no explanations, no markdown.`,
 		v.dataset,
@@ -240,6 +259,29 @@ func (v *InsightValidator) extractCount(result *gowarehouse.QueryResult) int {
 		}
 	}
 
+	return 0
+}
+
+// extractCountFromRows extracts the count from query result rows.
+// The verification prompt asks the LLM to alias as "count".
+// Falls back to first numeric value if "count" alias is missing.
+func extractCountFromRows(rows []map[string]interface{}) int {
+	if len(rows) == 0 {
+		return 0
+	}
+	row := rows[0]
+
+	// Primary: the prompt instructs "AS count"
+	if val, ok := row["count"]; ok {
+		return toInt(val)
+	}
+
+	// Fallback: first numeric value in the row
+	for _, val := range row {
+		if n := toInt(val); n > 0 {
+			return n
+		}
+	}
 	return 0
 }
 
