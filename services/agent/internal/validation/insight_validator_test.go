@@ -2,6 +2,7 @@ package validation
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	gowarehouse "github.com/decisionbox-io/decisionbox/libs/go-common/warehouse"
@@ -28,6 +29,79 @@ func newTestInsightValidator(t *testing.T) (*InsightValidator, *testutil.MockWar
 	})
 
 	return v, wh, llmProvider
+}
+
+func TestInsightValidatorQueryCleanup_JsonCodeBlock(t *testing.T) {
+	v, wh, llmProvider := newTestInsightValidator(t)
+
+	// LLM wraps SQL in ```json block (the bug that caused "Unexpected keyword JSON")
+	llmProvider.DefaultResponse.Content = "```json\nSELECT COUNT(DISTINCT user_id) AS count FROM `test_dataset.sessions`\n```"
+
+	wh.DefaultResult = &gowarehouse.QueryResult{
+		Columns: []string{"count"},
+		Rows:    []map[string]interface{}{{"count": int64(100)}},
+	}
+
+	insights := []models.Insight{
+		{ID: "1", Name: "Test", AffectedCount: 100, AnalysisArea: "churn"},
+	}
+
+	results := v.ValidateInsights(context.Background(), insights)
+
+	if results[0].Status == "error" {
+		t.Errorf("should not error — got: %s", results[0].QueryError)
+	}
+	if results[0].Query == "" {
+		t.Error("query should be extracted from json code block")
+	}
+	if strings.Contains(results[0].Query, "json") {
+		t.Errorf("query should not contain 'json' prefix: %q", results[0].Query)
+	}
+}
+
+func TestInsightValidatorQueryCleanup_SqlCodeBlock(t *testing.T) {
+	v, wh, llmProvider := newTestInsightValidator(t)
+
+	llmProvider.DefaultResponse.Content = "```sql\nSELECT COUNT(DISTINCT user_id) AS count FROM `test_dataset.sessions`\n```"
+
+	wh.DefaultResult = &gowarehouse.QueryResult{
+		Columns: []string{"count"},
+		Rows:    []map[string]interface{}{{"count": int64(100)}},
+	}
+
+	insights := []models.Insight{
+		{ID: "1", Name: "Test", AffectedCount: 100, AnalysisArea: "churn"},
+	}
+
+	results := v.ValidateInsights(context.Background(), insights)
+
+	if results[0].Status == "error" {
+		t.Errorf("should not error — got: %s", results[0].QueryError)
+	}
+	if strings.Contains(results[0].Query, "sql") {
+		t.Errorf("query should not contain 'sql' prefix: %q", results[0].Query)
+	}
+}
+
+func TestInsightValidatorQueryCleanup_RawSQL(t *testing.T) {
+	v, wh, llmProvider := newTestInsightValidator(t)
+
+	llmProvider.DefaultResponse.Content = "SELECT COUNT(DISTINCT user_id) AS count FROM `test_dataset.sessions`"
+
+	wh.DefaultResult = &gowarehouse.QueryResult{
+		Columns: []string{"count"},
+		Rows:    []map[string]interface{}{{"count": int64(100)}},
+	}
+
+	insights := []models.Insight{
+		{ID: "1", Name: "Test", AffectedCount: 100, AnalysisArea: "churn"},
+	}
+
+	results := v.ValidateInsights(context.Background(), insights)
+
+	if results[0].Status == "error" {
+		t.Errorf("should not error — got: %s", results[0].QueryError)
+	}
 }
 
 func TestInsightValidatorConfirmed(t *testing.T) {

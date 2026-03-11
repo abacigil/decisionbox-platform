@@ -224,11 +224,30 @@ Return ONLY the raw SQL query, no explanations, no markdown.`,
 
 	sql := strings.TrimSpace(chatResult.Content)
 
-	// Clean up markdown if present
-	sql = strings.TrimPrefix(sql, "```sql")
-	sql = strings.TrimPrefix(sql, "```")
-	sql = strings.TrimSuffix(sql, "```")
-	sql = strings.TrimSpace(sql)
+	// Clean up markdown code blocks (handles ```sql, ```json, ```, etc.)
+	if strings.Contains(sql, "```") {
+		// Extract content between first ``` and last ```
+		start := strings.Index(sql, "```")
+		end := strings.LastIndex(sql, "```")
+		if start != end {
+			inner := sql[start+3 : end]
+			// Strip language tag on first line (sql, json, etc.)
+			if nl := strings.Index(inner, "\n"); nl != -1 {
+				firstLine := strings.TrimSpace(inner[:nl])
+				// If first line is just a language tag (no spaces, short), skip it
+				if len(firstLine) <= 10 && !strings.Contains(firstLine, " ") {
+					inner = inner[nl+1:]
+				}
+			}
+			sql = strings.TrimSpace(inner)
+		} else {
+			// Single ``` — just strip it
+			sql = strings.TrimPrefix(sql, "```sql")
+			sql = strings.TrimPrefix(sql, "```json")
+			sql = strings.TrimPrefix(sql, "```")
+			sql = strings.TrimSpace(sql)
+		}
+	}
 
 	if !strings.Contains(strings.ToUpper(sql), "SELECT") {
 		return "", fmt.Errorf("generated response is not a SQL query")
