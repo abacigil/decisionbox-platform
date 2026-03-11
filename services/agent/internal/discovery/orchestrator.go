@@ -585,13 +585,14 @@ func (o *Orchestrator) resolvePrompts(dpPrompts domainpack.PromptTemplates, dpAr
 			})
 		}
 
-		// Add domain pack areas that aren't in project (backward compat)
-		existingIDs := make(map[string]bool)
-		for _, a := range areas {
-			existingIDs[a.ID] = true
+		// Add domain pack areas that aren't handled by project (backward compat).
+		// Areas explicitly in the project (enabled or disabled) are NOT added back.
+		handledByProject := make(map[string]bool)
+		for id := range o.projectPrompts.AnalysisAreas {
+			handledByProject[id] = true
 		}
 		for _, a := range dpAreas {
-			if !existingIDs[a.ID] {
+			if !handledByProject[a.ID] {
 				areas = append(areas, a)
 			}
 		}

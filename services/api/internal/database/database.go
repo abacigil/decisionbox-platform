@@ -108,6 +108,7 @@ func (r *ProjectRepository) Update(ctx context.Context, id string, p *models.Pro
 		filter["_id"] = id
 	}
 
+	p.ID = "" // don't attempt to update _id
 	p.UpdatedAt = time.Now()
 	update := bson.M{"$set": p}
 

@@ -2,12 +2,10 @@ package handler
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/decisionbox-io/decisionbox/libs/go-common/domainpack"
 	"github.com/decisionbox-io/decisionbox/services/api/internal/database"
 	"github.com/decisionbox-io/decisionbox/services/api/internal/models"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 // SeedProjectPrompts seeds a project with default prompts from the domain pack.
@@ -92,15 +90,9 @@ func UpdatePrompts(projectRepo *database.ProjectRepository) http.HandlerFunc {
 			return
 		}
 
-		// Update just the prompts field
-		col := projectRepo.GetCollection()
-		_, err = col.UpdateOne(r.Context(), bson.M{"_id": p.ID}, bson.M{
-			"$set": bson.M{
-				"prompts":    prompts,
-				"updated_at": time.Now(),
-			},
-		})
-		if err != nil {
+		// Update via project repo
+		p.Prompts = &prompts
+		if err := projectRepo.Update(r.Context(), id, p); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to update prompts: "+err.Error())
 			return
 		}
