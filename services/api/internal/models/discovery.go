@@ -9,6 +9,8 @@ type DiscoveryResult struct {
 	ProjectID     string    `bson:"project_id" json:"project_id"`
 	Domain        string    `bson:"domain" json:"domain"`
 	Category      string    `bson:"category" json:"category"`
+	RunType        string   `bson:"run_type" json:"run_type"`
+	AreasRequested []string `bson:"areas_requested,omitempty" json:"areas_requested"`
 	DiscoveryDate time.Time `bson:"discovery_date" json:"discovery_date"`
 
 	TotalSteps int   `bson:"total_steps" json:"total_steps"`

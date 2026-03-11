@@ -22,6 +22,7 @@ export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [discoveries, setDiscoveries] = useState<DiscoveryResult[]>([]);
   const [run, setRun] = useState<DiscoveryRunStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
@@ -29,11 +30,12 @@ export default function ProjectPage() {
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [maxSteps, setMaxSteps] = useState(100);
 
-  // Load project, latest discovery, and analysis areas
+  // Load project, discoveries, and analysis areas
   useEffect(() => {
     Promise.all([
       api.getProject(id).then(setProject),
       api.getLatestDiscovery(id).then(setDiscovery).catch(() => null),
+      api.listDiscoveries(id).then(setDiscoveries).catch(() => []),
       api.getProject(id).then((p) =>
         api.getAnalysisAreas(p.domain, p.category)
           .then((areas) => setAnalysisAreas(areas.map((a) => ({ id: a.id, name: a.name }))))
@@ -279,6 +281,38 @@ export default function ProjectPage() {
               </Card>
             )}
           </>
+        )}
+
+        {/* Discovery History */}
+        {discoveries.length > 0 && (
+          <Card withBorder p="lg">
+            <Title order={3} mb="md">Discovery History</Title>
+            <Stack gap="sm">
+              {discoveries.map((d) => (
+                <Card key={d.id} withBorder p="sm" radius="sm"
+                  style={{ cursor: 'pointer', borderLeft: d.id === discovery?.id ? '3px solid var(--mantine-color-blue-6)' : undefined }}
+                  onClick={() => setDiscovery(d)}>
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <Text size="sm" fw={d.id === discovery?.id ? 700 : 400}>
+                        {new Date(d.discovery_date).toLocaleString()}
+                      </Text>
+                      <Badge size="xs" variant="light" color={d.run_type === 'partial' ? 'violet' : 'blue'}>
+                        {d.run_type || 'full'}
+                      </Badge>
+                      {d.areas_requested && d.areas_requested.length > 0 && (
+                        <Text size="xs" c="dimmed">({d.areas_requested.join(', ')})</Text>
+                      )}
+                    </Group>
+                    <Group gap="xs">
+                      <Badge size="xs" variant="outline">{d.summary?.total_insights || 0} insights</Badge>
+                      <Badge size="xs" variant="outline">{d.total_steps} steps</Badge>
+                    </Group>
+                  </Group>
+                </Card>
+              ))}
+            </Stack>
+          </Card>
         )}
       </Stack>
     </Shell>

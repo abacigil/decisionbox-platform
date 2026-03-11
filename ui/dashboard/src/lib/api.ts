@@ -96,6 +96,8 @@ export interface DiscoveryResult {
   project_id: string;
   domain: string;
   category: string;
+  run_type: string; // "full" or "partial"
+  areas_requested: string[];
   discovery_date: string;
   total_steps: number;
   duration: number;
