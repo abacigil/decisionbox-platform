@@ -152,6 +152,88 @@ func TestExplorationResultDefaults(t *testing.T) {
 	}
 }
 
+func TestNewExplorationEngine_Defaults(t *testing.T) {
+	engine := NewExplorationEngine(ExplorationEngineOptions{})
+	if engine.maxSteps != 100 {
+		t.Errorf("maxSteps = %d, want 100 (default)", engine.maxSteps)
+	}
+	if engine.onStep != nil {
+		t.Error("onStep should be nil by default")
+	}
+}
+
+func TestNewExplorationEngine_WithOnStep(t *testing.T) {
+	called := false
+	cb := func(stepNum int, thinking, query string, rowCount int, queryTimeMs int64, queryFixed bool, errMsg string) {
+		called = true
+	}
+
+	engine := NewExplorationEngine(ExplorationEngineOptions{
+		MaxSteps: 10,
+		OnStep:   cb,
+	})
+
+	if engine.maxSteps != 10 {
+		t.Errorf("maxSteps = %d, want 10", engine.maxSteps)
+	}
+	if engine.onStep == nil {
+		t.Fatal("onStep should be set")
+	}
+
+	// Invoke the callback
+	engine.onStep(1, "thinking", "SELECT 1", 5, 100, false, "")
+	if !called {
+		t.Error("onStep callback was not invoked")
+	}
+}
+
+func TestOnStepCallback_Parameters(t *testing.T) {
+	var gotStep int
+	var gotThinking, gotQuery, gotErr string
+	var gotRows int
+	var gotTimeMs int64
+	var gotFixed bool
+
+	cb := func(stepNum int, thinking, query string, rowCount int, queryTimeMs int64, queryFixed bool, errMsg string) {
+		gotStep = stepNum
+		gotThinking = thinking
+		gotQuery = query
+		gotRows = rowCount
+		gotTimeMs = queryTimeMs
+		gotFixed = queryFixed
+		gotErr = errMsg
+	}
+
+	engine := NewExplorationEngine(ExplorationEngineOptions{
+		MaxSteps: 5,
+		OnStep:   cb,
+	})
+
+	engine.onStep(3, "checking retention", "SELECT COUNT(*) FROM sessions", 42, 250, true, "some error")
+
+	if gotStep != 3 {
+		t.Errorf("stepNum = %d, want 3", gotStep)
+	}
+	if gotThinking != "checking retention" {
+		t.Errorf("thinking = %q", gotThinking)
+	}
+	if gotQuery != "SELECT COUNT(*) FROM sessions" {
+		t.Errorf("query = %q", gotQuery)
+	}
+	if gotRows != 42 {
+		t.Errorf("rowCount = %d, want 42", gotRows)
+	}
+	if gotTimeMs != 250 {
+		t.Errorf("queryTimeMs = %d, want 250", gotTimeMs)
+	}
+	if !gotFixed {
+		t.Error("queryFixed should be true")
+	}
+	if gotErr != "some error" {
+		t.Errorf("errMsg = %q", gotErr)
+	}
+}
+
 func TestExplorationContextFields(t *testing.T) {
 	ctx := ExplorationContext{
 		ProjectID:     "proj-123",

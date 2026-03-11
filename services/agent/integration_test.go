@@ -20,7 +20,6 @@ import (
 	"github.com/decisionbox-io/decisionbox/services/agent/internal/testutil"
 	"github.com/decisionbox-io/decisionbox/services/agent/internal/validation"
 	"github.com/decisionbox-io/decisionbox/services/agent/internal/ai"
-	"github.com/decisionbox-io/decisionbox/services/agent/internal/config"
 	applog "github.com/decisionbox-io/decisionbox/services/agent/internal/log"
 
 	tcmongo "github.com/testcontainers/testcontainers-go/modules/mongodb"

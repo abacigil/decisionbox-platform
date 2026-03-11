@@ -9,8 +9,8 @@ import (
 )
 
 func init() {
-	// Tests run from domain-packs/gaming/go/ — set path relative to that
-	os.Setenv("DOMAIN_PACK_PATH", "..")
+	// Tests run from domain-packs/gaming/go/ — DOMAIN_PACK_PATH is the domain-packs root
+	os.Setenv("DOMAIN_PACK_PATH", "../..")
 }
 
 func TestGamingPackImplementsDiscoveryPack(t *testing.T) {

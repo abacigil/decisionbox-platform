@@ -27,7 +27,7 @@ func init() {
 	wd, _ := os.Getwd()
 	// Walk up 4 levels: handler -> internal -> api -> services -> repo root
 	root := filepath.Join(wd, "..", "..", "..", "..")
-	os.Setenv("DOMAIN_PACK_PATH", filepath.Join(root, "domain-packs", "gaming"))
+	os.Setenv("DOMAIN_PACK_PATH", filepath.Join(root, "domain-packs"))
 }
 
 func TestHealthCheck(t *testing.T) {

@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 
 	// Set domain pack path for prompt seeding (relative to repo root)
 	wd, _ := os.Getwd()
-	os.Setenv("DOMAIN_PACK_PATH", filepath.Join(wd, "../../domain-packs/gaming"))
+	os.Setenv("DOMAIN_PACK_PATH", filepath.Join(wd, "../../domain-packs"))
 
 	container, err := tcmongo.Run(ctx, "mongo:7.0")
 	if err != nil {

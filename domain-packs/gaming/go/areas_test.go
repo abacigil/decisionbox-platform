@@ -152,8 +152,8 @@ func TestGetPromptsPath_EnvOverride(t *testing.T) {
 	defer os.Setenv("DOMAIN_PACK_PATH", old)
 
 	path := getPromptsPath()
-	if path != "/custom/path/prompts" {
-		t.Errorf("path = %q, want /custom/path/prompts", path)
+	if path != "/custom/path/gaming/prompts" {
+		t.Errorf("path = %q, want /custom/path/gaming/prompts", path)
 	}
 }
 
@@ -163,8 +163,8 @@ func TestGetProfilesPath_EnvOverride(t *testing.T) {
 	defer os.Setenv("DOMAIN_PACK_PATH", old)
 
 	path := getProfilesPath()
-	if path != "/custom/path/profiles" {
-		t.Errorf("path = %q, want /custom/path/profiles", path)
+	if path != "/custom/path/gaming/profiles" {
+		t.Errorf("path = %q, want /custom/path/gaming/profiles", path)
 	}
 }
 
