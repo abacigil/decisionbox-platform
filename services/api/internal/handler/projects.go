@@ -91,21 +91,52 @@ func (h *ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Update updates a project.
 // PUT /api/v1/projects/{id}
+// Merges incoming fields with existing project — preserves fields not in the request
+// (e.g., settings page doesn't send prompts, prompts page doesn't send warehouse).
 func (h *ProjectsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	var p models.Project
-	if err := decodeJSON(r, &p); err != nil {
+	existing, err := h.repo.GetByID(r.Context(), id)
+	if err != nil || existing == nil {
+		writeError(w, http.StatusNotFound, "project not found")
+		return
+	}
+
+	var incoming models.Project
+	if err := decodeJSON(r, &incoming); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
 
-	if err := h.repo.Update(r.Context(), id, &p); err != nil {
+	// Merge: update only fields that are present in the request
+	if incoming.Name != "" {
+		existing.Name = incoming.Name
+	}
+	if incoming.Description != "" || incoming.Name != "" {
+		existing.Description = incoming.Description
+	}
+	if incoming.Warehouse.Provider != "" {
+		existing.Warehouse = incoming.Warehouse
+	}
+	if incoming.LLM.Provider != "" {
+		existing.LLM = incoming.LLM
+	}
+	if incoming.Schedule.CronExpr != "" || incoming.Schedule.Enabled {
+		existing.Schedule = incoming.Schedule
+	}
+	if incoming.Profile != nil {
+		existing.Profile = incoming.Profile
+	}
+	if incoming.Prompts != nil {
+		existing.Prompts = incoming.Prompts
+	}
+
+	if err := h.repo.Update(r.Context(), id, existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update project: "+err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, existing)
 }
 
 // Delete deletes a project.
