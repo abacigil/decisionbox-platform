@@ -36,11 +36,12 @@ type Orchestrator struct {
 	debugLogger    *debug.Logger
 	statusReporter *StatusReporter
 
-	projectID   string
-	domain      string
-	category    string
-	profile     map[string]interface{}
-	datasets    []string
+	projectID      string
+	domain         string
+	category       string
+	profile        map[string]interface{}
+	projectPrompts *models.ProjectPrompts
+	datasets       []string
 	filterField string
 	filterValue string
 }
@@ -62,6 +63,7 @@ type OrchestratorOptions struct {
 	Domain          string
 	Category        string
 	Profile         map[string]interface{}
+	ProjectPrompts  *models.ProjectPrompts
 	Datasets        []string
 	FilterField     string
 	FilterValue     string
@@ -127,6 +129,7 @@ func NewOrchestrator(opts OrchestratorOptions) *Orchestrator {
 		domain:             opts.Domain,
 		category:           opts.Category,
 		profile:            opts.Profile,
+		projectPrompts:     opts.ProjectPrompts,
 		datasets:           opts.Datasets,
 		filterField:        opts.FilterField,
 		filterValue:        opts.FilterValue,
@@ -151,9 +154,11 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	startTime := time.Now()
 
-	// Get prompts and analysis areas from domain pack
-	prompts := o.discoveryPack.Prompts(o.category)
-	analysisAreas := o.discoveryPack.AnalysisAreas(o.category)
+	// Get prompts: project config takes priority, fallback to domain pack defaults
+	dpPrompts := o.discoveryPack.Prompts(o.category)
+	dpAreas := o.discoveryPack.AnalysisAreas(o.category)
+
+	prompts, analysisAreas := o.resolvePrompts(dpPrompts, dpAreas)
 
 	// Build filter clause
 	filterClause := o.buildFilterClause()
@@ -505,6 +510,72 @@ func (o *Orchestrator) generateRecommendations(
 }
 
 // --- Helper methods ---
+
+// resolvePrompts merges project-level prompts with domain pack defaults.
+// Project prompts override domain pack. Custom areas are added.
+func (o *Orchestrator) resolvePrompts(dpPrompts domainpack.PromptTemplates, dpAreas []domainpack.AnalysisArea) (domainpack.PromptTemplates, []domainpack.AnalysisArea) {
+	if o.projectPrompts == nil {
+		return dpPrompts, dpAreas
+	}
+
+	resolved := dpPrompts
+
+	// Override exploration prompt if project has one
+	if o.projectPrompts.Exploration != "" {
+		resolved.Exploration = o.projectPrompts.Exploration
+	}
+
+	// Override recommendations prompt
+	if o.projectPrompts.Recommendations != "" {
+		resolved.Recommendations = o.projectPrompts.Recommendations
+	}
+
+	// Merge analysis areas: project overrides domain pack, custom areas added
+	if len(o.projectPrompts.AnalysisAreas) > 0 {
+		resolved.AnalysisAreas = make(map[string]string)
+
+		// Start with domain pack defaults
+		for id, prompt := range dpPrompts.AnalysisAreas {
+			resolved.AnalysisAreas[id] = prompt
+		}
+
+		// Override/add from project
+		var areas []domainpack.AnalysisArea
+		for id, cfg := range o.projectPrompts.AnalysisAreas {
+			if !cfg.Enabled {
+				// User disabled this area — remove from domain pack
+				delete(resolved.AnalysisAreas, id)
+				continue
+			}
+			if cfg.Prompt != "" {
+				resolved.AnalysisAreas[id] = cfg.Prompt
+			}
+			areas = append(areas, domainpack.AnalysisArea{
+				ID:          id,
+				Name:        cfg.Name,
+				Description: cfg.Description,
+				Keywords:    cfg.Keywords,
+				IsBase:      cfg.IsBase,
+				Priority:    cfg.Priority,
+			})
+		}
+
+		// Add domain pack areas that aren't in project (backward compat)
+		existingIDs := make(map[string]bool)
+		for _, a := range areas {
+			existingIDs[a.ID] = true
+		}
+		for _, a := range dpAreas {
+			if !existingIDs[a.ID] {
+				areas = append(areas, a)
+			}
+		}
+
+		return resolved, areas
+	}
+
+	return resolved, dpAreas
+}
 
 func (o *Orchestrator) buildFilterClause() string {
 	if o.filterField == "" || o.filterValue == "" {

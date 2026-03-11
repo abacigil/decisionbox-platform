@@ -56,6 +56,10 @@ func New(db *database.DB) http.Handler {
 	mux.HandleFunc("PUT /api/v1/projects/{id}", projects.Update)
 	mux.HandleFunc("DELETE /api/v1/projects/{id}", projects.Delete)
 
+	// Prompts
+	mux.HandleFunc("GET /api/v1/projects/{id}/prompts", handler.GetPrompts(projectRepo))
+	mux.HandleFunc("PUT /api/v1/projects/{id}/prompts", handler.UpdatePrompts(projectRepo))
+
 	// Discoveries
 	mux.HandleFunc("POST /api/v1/projects/{id}/discover", discoveries.TriggerDiscovery)
 	mux.HandleFunc("GET /api/v1/projects/{id}/discoveries", discoveries.List)

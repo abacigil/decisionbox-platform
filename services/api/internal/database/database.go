@@ -36,6 +36,10 @@ func NewProjectRepository(db *DB) *ProjectRepository {
 	return &ProjectRepository{col: db.Collection("projects")}
 }
 
+func (r *ProjectRepository) GetCollection() *mongo.Collection {
+	return r.col
+}
+
 func (r *ProjectRepository) Create(ctx context.Context, p *models.Project) error {
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()

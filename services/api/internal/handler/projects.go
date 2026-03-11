@@ -39,6 +39,11 @@ func (h *ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Seed default prompts from domain pack
+	if p.Prompts == nil {
+		SeedProjectPrompts(&p)
+	}
+
 	if err := h.repo.Create(r.Context(), &p); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create project: "+err.Error())
 		return

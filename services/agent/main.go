@@ -196,6 +196,7 @@ func runDiscovery(cfg *config.Config, projectID string, runID string, maxSteps i
 		Domain:          project.Domain,
 		Category:        project.Category,
 		Profile:         project.Profile,
+		ProjectPrompts:  project.Prompts,
 		Datasets:        datasets,
 		FilterField:     project.Warehouse.FilterField,
 		FilterValue:     project.Warehouse.FilterValue,
