@@ -14,25 +14,36 @@ COPY providers/llm/bedrock/go.mod providers/llm/bedrock/
 COPY providers/warehouse/bigquery/go.mod providers/warehouse/bigquery/go.sum providers/warehouse/bigquery/
 COPY domain-packs/gaming/go/go.mod domain-packs/gaming/go/
 COPY services/api/go.mod services/api/go.sum services/api/
+COPY services/agent/go.mod services/agent/go.sum services/agent/
 
+# Download deps for both services
 WORKDIR /workspace/services/api
 RUN go mod download
+WORKDIR /workspace/services/agent
+RUN go mod download
 
-# Copy source
+# Copy all source
 WORKDIR /workspace
 COPY libs/ libs/
 COPY providers/ providers/
 COPY domain-packs/ domain-packs/
 COPY services/api/ services/api/
+COPY services/agent/ services/agent/
 
+# Build both binaries
 WORKDIR /workspace/services/api
 RUN CGO_ENABLED=0 GOOS=linux go build -o /decisionbox-api .
+
+WORKDIR /workspace/services/agent
+RUN CGO_ENABLED=0 GOOS=linux go build -o /decisionbox-agent .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata && \
     addgroup -g 1000 -S app && adduser -u 1000 -S app -G app
 
+# Include both binaries — API spawns agent as subprocess
 COPY --from=builder /decisionbox-api /usr/local/bin/decisionbox-api
+COPY --from=builder /decisionbox-agent /usr/local/bin/decisionbox-agent
 
 EXPOSE 8080
 USER app

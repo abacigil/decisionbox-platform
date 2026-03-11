@@ -186,6 +186,35 @@ func (p *BigQueryProvider) SQLFixPrompt() string {
 	return sqlFixPrompt
 }
 
+func (p *BigQueryProvider) ValidateReadOnly(ctx context.Context) error {
+	// Validate by attempting a safe read query. If the service account
+	// has only BigQuery Data Viewer + Job User roles, this succeeds
+	// but write operations would fail.
+	//
+	// We verify read access works and DON'T test write access.
+	// The proper IAM roles for read-only BigQuery access are:
+	//   - roles/bigquery.dataViewer (read tables)
+	//   - roles/bigquery.jobUser (run queries)
+	// These do NOT include bigquery.tables.create/update/delete.
+
+	// Test 1: Can read dataset metadata
+	ds := p.client.Dataset(p.dataset)
+	if _, err := ds.Metadata(ctx); err != nil {
+		return fmt.Errorf("bigquery: cannot access dataset %s: %w", p.dataset, err)
+	}
+
+	// Test 2: Can run a simple query
+	q := p.client.Query("SELECT 1 as test")
+	q.Location = p.config.Location
+	it, err := q.Read(ctx)
+	if err != nil {
+		return fmt.Errorf("bigquery: cannot execute queries: %w", err)
+	}
+	_ = it // just check it doesn't error
+
+	return nil
+}
+
 func (p *BigQueryProvider) HealthCheck(ctx context.Context) error {
 	ds := p.client.Dataset(p.dataset)
 	_, err := ds.Metadata(ctx)

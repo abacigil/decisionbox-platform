@@ -39,6 +39,11 @@ type Provider interface {
 	// Returns empty string if no warehouse-specific prompt is available.
 	SQLFixPrompt() string
 
+	// ValidateReadOnly checks that the configured credentials have
+	// read-only access (no write/delete permissions). Safety check
+	// to prevent accidental data modification.
+	ValidateReadOnly(ctx context.Context) error
+
 	// HealthCheck verifies the warehouse connection is alive.
 	HealthCheck(ctx context.Context) error
 

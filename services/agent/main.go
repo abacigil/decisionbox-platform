@@ -35,6 +35,7 @@ import (
 func main() {
 	var (
 		projectID       = flag.String("project-id", "", "Project ID to run discovery for (required)")
+		runID           = flag.String("run-id", "", "Discovery run ID for status updates (set by API)")
 		maxSteps        = flag.Int("max-steps", 100, "Maximum exploration steps")
 		skipCache       = flag.Bool("skip-cache", false, "Force schema rediscovery")
 		includeLog      = flag.Bool("include-log", false, "Include full exploration log")
@@ -70,14 +71,14 @@ func main() {
 		"env":        cfg.Service.Environment,
 	}).Info("Starting DecisionBox Agent")
 
-	if err := runDiscovery(cfg, *projectID, *maxSteps, *skipCache, *includeLog, *testMode, *enableDebugLogs); err != nil {
+	if err := runDiscovery(cfg, *projectID, *runID, *maxSteps, *skipCache, *includeLog, *testMode, *enableDebugLogs); err != nil {
 		applog.WithError(err).Fatal("Discovery failed")
 	}
 
 	applog.Info("Discovery completed successfully")
 }
 
-func runDiscovery(cfg *config.Config, projectID string, maxSteps int, skipCache, includeLog, testMode, enableDebugLogs bool) error {
+func runDiscovery(cfg *config.Config, projectID string, runID string, maxSteps int, skipCache, includeLog, testMode, enableDebugLogs bool) error {
 	ctx := context.Background()
 
 	// Initialize MongoDB
@@ -203,6 +204,9 @@ func runDiscovery(cfg *config.Config, projectID string, maxSteps int, skipCache,
 		}
 	}
 
+	// Initialize run repository for status updates
+	runRepo := database.NewRunRepository(db)
+
 	// Create orchestrator
 	orchestrator := discovery.NewOrchestrator(discovery.OrchestratorOptions{
 		AIClient:        aiClient,
@@ -211,6 +215,8 @@ func runDiscovery(cfg *config.Config, projectID string, maxSteps int, skipCache,
 		ContextRepo:     contextRepo,
 		DiscoveryRepo:   discoveryRepo,
 		DebugLogRepo:    debugLogRepo,
+		RunRepo:         runRepo,
+		RunID:           runID,
 		ProjectID:       projectID,
 		Domain:          project.Domain,
 		Category:        project.Category,

@@ -1,0 +1,95 @@
+package database
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/decisionbox-io/decisionbox/services/api/internal/models"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+// RunRepository manages DiscoveryRun documents.
+type RunRepository struct {
+	col *mongo.Collection
+}
+
+func NewRunRepository(db *DB) *RunRepository {
+	return &RunRepository{col: db.Collection("discovery_runs")}
+}
+
+// Create creates a new discovery run record.
+func (r *RunRepository) Create(ctx context.Context, projectID string) (string, error) {
+	run := models.DiscoveryRun{
+		ProjectID: projectID,
+		Status:    "pending",
+		Phase:     "init",
+		Progress:  0,
+		StartedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Steps:     make([]models.RunStep, 0),
+	}
+
+	result, err := r.col.InsertOne(ctx, run)
+	if err != nil {
+		return "", fmt.Errorf("create run: %w", err)
+	}
+
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		return oid.Hex(), nil
+	}
+	return "", nil
+}
+
+// GetByID returns a discovery run by ID.
+func (r *RunRepository) GetByID(ctx context.Context, runID string) (*models.DiscoveryRun, error) {
+	oid, err := primitive.ObjectIDFromHex(runID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid run ID: %w", err)
+	}
+
+	var run models.DiscoveryRun
+	if err := r.col.FindOne(ctx, bson.M{"_id": oid}).Decode(&run); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &run, nil
+}
+
+// GetLatestByProject returns the most recent run for a project.
+func (r *RunRepository) GetLatestByProject(ctx context.Context, projectID string) (*models.DiscoveryRun, error) {
+	opts := options.FindOne().SetSort(bson.D{{Key: "started_at", Value: -1}})
+
+	var run models.DiscoveryRun
+	err := r.col.FindOne(ctx, bson.M{"project_id": projectID}, opts).Decode(&run)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &run, nil
+}
+
+// GetRunningByProject checks if there's an active run for a project.
+func (r *RunRepository) GetRunningByProject(ctx context.Context, projectID string) (*models.DiscoveryRun, error) {
+	filter := bson.M{
+		"project_id": projectID,
+		"status":     bson.M{"$in": []string{"pending", "running"}},
+	}
+
+	var run models.DiscoveryRun
+	err := r.col.FindOne(ctx, filter).Decode(&run)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &run, nil
+}

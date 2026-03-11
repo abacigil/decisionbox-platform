@@ -144,6 +144,7 @@ func (m *MockWarehouseProvider) SQLFixPrompt() string {
 	return "Fix this {{ORIGINAL_SQL}} query. Error: {{ERROR_MESSAGE}}"
 }
 
+func (m *MockWarehouseProvider) ValidateReadOnly(ctx context.Context) error { return nil }
 func (m *MockWarehouseProvider) HealthCheck(ctx context.Context) error { return nil }
 func (m *MockWarehouseProvider) Close() error                         { return nil }
 

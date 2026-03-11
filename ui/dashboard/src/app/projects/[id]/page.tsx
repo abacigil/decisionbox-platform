@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
-  Badge, Button, Card, Grid, Group, Loader, Stack, Tabs, Text, Title,
+  Badge, Button, Card, Code, Grid, Group, Loader, Progress, ScrollArea, Stack, Tabs, Text, Timeline, Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconAlertTriangle, IconBulb, IconChartBar, IconPlayerPlay, IconTrendingUp,
+  IconAlertTriangle, IconBulb, IconChartBar, IconCheck, IconDatabase,
+  IconPlayerPlay, IconSearch, IconTrendingUp, IconX,
 } from '@tabler/icons-react';
 import Shell from '@/components/layout/AppShell';
-import { api, DiscoveryResult, Insight, Project, Recommendation } from '@/lib/api';
+import { api, DiscoveryResult, DiscoveryRunStatus, Insight, Project, Recommendation, RunStep } from '@/lib/api';
 
 const severityColor: Record<string, string> = {
   critical: 'red', high: 'orange', medium: 'yellow', low: 'gray',
@@ -20,9 +21,11 @@ export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [run, setRun] = useState<DiscoveryRunStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
 
+  // Load project and latest discovery
   useEffect(() => {
     Promise.all([
       api.getProject(id).then(setProject),
@@ -32,11 +35,35 @@ export default function ProjectPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Poll for live run status
+  const pollStatus = useCallback(async () => {
+    try {
+      const status = await api.getProjectStatus(id);
+      if (status?.run) {
+        setRun(status.run as unknown as DiscoveryRunStatus);
+      }
+    } catch { /* ignore polling errors */ }
+  }, [id]);
+
+  useEffect(() => {
+    if (!run || (run.status !== 'running' && run.status !== 'pending')) return;
+    const interval = setInterval(pollStatus, 2000); // poll every 2s
+    return () => clearInterval(interval);
+  }, [run, pollStatus]);
+
+  // Also poll once on mount to pick up any running discovery
+  useEffect(() => { pollStatus(); }, [pollStatus]);
+
   const handleTrigger = async () => {
     setTriggering(true);
     try {
       const result = await api.triggerDiscovery(id);
-      notifications.show({ title: 'Discovery triggered', message: result.message, color: 'blue' });
+      if (result.run_id) {
+        // Start polling
+        const newRun = await api.getRun(result.run_id);
+        setRun(newRun);
+      }
+      notifications.show({ title: 'Discovery started', message: result.message, color: 'blue' });
     } catch (e: unknown) {
       notifications.show({ title: 'Error', message: (e as Error).message, color: 'red' });
     } finally {
@@ -44,23 +71,17 @@ export default function ProjectPage() {
     }
   };
 
-  if (loading) {
-    return <Shell><Loader /></Shell>;
-  }
+  if (loading) return <Shell><Loader /></Shell>;
+  if (!project) return <Shell><Text>Project not found</Text></Shell>;
 
-  if (!project) {
-    return <Shell><Text>Project not found</Text></Shell>;
-  }
+  const isRunning = run && (run.status === 'running' || run.status === 'pending');
 
   // Group insights by analysis area
   const insightsByArea: Record<string, Insight[]> = {};
   discovery?.insights?.forEach((insight) => {
-    if (!insightsByArea[insight.analysis_area]) {
-      insightsByArea[insight.analysis_area] = [];
-    }
+    if (!insightsByArea[insight.analysis_area]) insightsByArea[insight.analysis_area] = [];
     insightsByArea[insight.analysis_area].push(insight);
   });
-
   const areas = Object.keys(insightsByArea);
 
   return (
@@ -73,18 +94,44 @@ export default function ProjectPage() {
             <Group gap="xs" mt={4}>
               <Badge variant="light">{project.domain}</Badge>
               <Badge variant="light" color="blue">{project.category}</Badge>
-              <Badge variant="light" color={project.status === 'active' ? 'green' : 'gray'}>
-                {project.status}
-              </Badge>
             </Group>
           </div>
-          <Button leftSection={<IconPlayerPlay size={16} />} onClick={handleTrigger} loading={triggering}>
-            Run Discovery
+          <Button
+            leftSection={<IconPlayerPlay size={16} />}
+            onClick={handleTrigger}
+            loading={triggering}
+            disabled={!!isRunning}
+          >
+            {isRunning ? 'Running...' : 'Run Discovery'}
           </Button>
         </Group>
 
+        {/* Live Run Status */}
+        {run && (run.status === 'running' || run.status === 'pending') && (
+          <LiveRunStatus run={run} />
+        )}
+
+        {/* Completed Run Summary */}
+        {run && run.status === 'completed' && !discovery && (
+          <Card withBorder p="md" bg="green.0">
+            <Group>
+              <IconCheck size={20} color="green" />
+              <Text fw={600}>Discovery completed — {run.insights_found} insights found</Text>
+            </Group>
+          </Card>
+        )}
+
+        {run && run.status === 'failed' && (
+          <Card withBorder p="md" bg="red.0">
+            <Group>
+              <IconX size={20} color="red" />
+              <Text fw={600}>Discovery failed: {run.error}</Text>
+            </Group>
+          </Card>
+        )}
+
         {/* No discovery yet */}
-        {!discovery && (
+        {!discovery && !isRunning && (
           <Card withBorder p="xl" ta="center">
             <Stack align="center" gap="md">
               <IconChartBar size={48} color="var(--mantine-color-gray-5)" />
@@ -100,13 +147,13 @@ export default function ProjectPage() {
             <Grid>
               <Grid.Col span={{ base: 6, md: 3 }}>
                 <Card withBorder p="md" ta="center">
-                  <Text size="xl" fw={700} c="blue">{discovery.summary.total_insights}</Text>
+                  <Text size="xl" fw={700} c="blue">{discovery.summary?.total_insights || 0}</Text>
                   <Text size="sm" c="dimmed">Insights</Text>
                 </Card>
               </Grid.Col>
               <Grid.Col span={{ base: 6, md: 3 }}>
                 <Card withBorder p="md" ta="center">
-                  <Text size="xl" fw={700} c="violet">{discovery.summary.total_recommendations}</Text>
+                  <Text size="xl" fw={700} c="violet">{discovery.summary?.total_recommendations || 0}</Text>
                   <Text size="sm" c="dimmed">Recommendations</Text>
                 </Card>
               </Grid.Col>
@@ -120,7 +167,7 @@ export default function ProjectPage() {
               </Grid.Col>
               <Grid.Col span={{ base: 6, md: 3 }}>
                 <Card withBorder p="md" ta="center">
-                  <Text size="xl" fw={700} c="green">{discovery.summary.queries_executed}</Text>
+                  <Text size="xl" fw={700} c="green">{discovery.summary?.queries_executed || 0}</Text>
                   <Text size="sm" c="dimmed">Queries Run</Text>
                 </Card>
               </Grid.Col>
@@ -136,15 +183,12 @@ export default function ProjectPage() {
                     </Tabs.Tab>
                   ))}
                 </Tabs.List>
-
                 {areas.map((area) => (
                   <Tabs.Panel key={area} value={area} pt="md">
                     <Stack gap="md">
-                      {insightsByArea[area]
-                        .sort((a, b) => b.risk_score - a.risk_score)
-                        .map((insight, idx) => (
-                          <InsightCard key={idx} insight={insight} />
-                        ))}
+                      {insightsByArea[area].sort((a, b) => b.risk_score - a.risk_score).map((insight, idx) => (
+                        <InsightCard key={idx} insight={insight} />
+                      ))}
                     </Stack>
                   </Tabs.Panel>
                 ))}
@@ -159,11 +203,9 @@ export default function ProjectPage() {
                   Recommendations
                 </Title>
                 <Stack gap="md">
-                  {discovery.recommendations
-                    .sort((a, b) => b.priority - a.priority)
-                    .map((rec, idx) => (
-                      <RecommendationCard key={idx} rec={rec} />
-                    ))}
+                  {discovery.recommendations.sort((a, b) => b.priority - a.priority).map((rec, idx) => (
+                    <RecommendationCard key={idx} rec={rec} />
+                  ))}
                 </Stack>
               </Card>
             )}
@@ -174,6 +216,76 @@ export default function ProjectPage() {
   );
 }
 
+// --- Live Run Status ---
+
+function LiveRunStatus({ run }: { run: DiscoveryRunStatus }) {
+  const phaseIcon: Record<string, React.ReactNode> = {
+    init: <IconDatabase size={14} />,
+    schema_discovery: <IconDatabase size={14} />,
+    exploration: <IconSearch size={14} />,
+    analysis: <IconChartBar size={14} />,
+    recommendations: <IconBulb size={14} />,
+    saving: <IconCheck size={14} />,
+  };
+
+  return (
+    <Card withBorder p="lg" shadow="sm">
+      <Group justify="space-between" mb="sm">
+        <Group>
+          <Loader size="sm" />
+          <Title order={4}>Discovery Running</Title>
+        </Group>
+        <Badge color="blue" variant="light">{run.phase}</Badge>
+      </Group>
+
+      <Progress value={run.progress} mb="sm" animated />
+
+      <Text size="sm" c="dimmed" mb="md">{run.phase_detail}</Text>
+
+      <Group gap="xl" mb="md">
+        <Text size="xs" c="dimmed">Queries: {run.total_queries}</Text>
+        <Text size="xs" c="dimmed">Insights: {run.insights_found}</Text>
+      </Group>
+
+      {/* Live step log */}
+      {run.steps && run.steps.length > 0 && (
+        <ScrollArea h={300} type="auto">
+          <Timeline active={run.steps.length - 1} bulletSize={20} lineWidth={2}>
+            {run.steps.slice(-20).map((step, idx) => (
+              <Timeline.Item
+                key={idx}
+                bullet={step.type === 'insight' ? <IconBulb size={12} /> :
+                        step.type === 'error' ? <IconX size={12} /> :
+                        step.type === 'query' ? <IconDatabase size={12} /> :
+                        phaseIcon[step.phase] || undefined}
+                color={step.type === 'error' ? 'red' : step.type === 'insight' ? 'green' : 'blue'}
+                title={step.message}
+              >
+                {step.llm_thinking && (
+                  <Text size="xs" c="dimmed" mt={2}>Thinking: {step.llm_thinking}</Text>
+                )}
+                {step.query && (
+                  <Code block mt={4} style={{ fontSize: '11px', maxHeight: 80, overflow: 'auto' }}>
+                    {step.query}
+                  </Code>
+                )}
+                {step.query_result && (
+                  <Text size="xs" c="dimmed" mt={2}>{step.query_result}</Text>
+                )}
+                {step.error && (
+                  <Text size="xs" c="red" mt={2}>{step.error}</Text>
+                )}
+              </Timeline.Item>
+            ))}
+          </Timeline>
+        </ScrollArea>
+      )}
+    </Card>
+  );
+}
+
+// --- Insight Card ---
+
 function InsightCard({ insight }: { insight: Insight }) {
   return (
     <Card withBorder p="md" radius="md">
@@ -183,17 +295,13 @@ function InsightCard({ insight }: { insight: Insight }) {
           <Text fw={600}>{insight.name}</Text>
         </Group>
         <Group gap="xs">
-          <Badge color={severityColor[insight.severity] || 'gray'} variant="light" size="sm">
-            {insight.severity}
-          </Badge>
+          <Badge color={severityColor[insight.severity] || 'gray'} variant="light" size="sm">{insight.severity}</Badge>
           {insight.affected_count > 0 && (
             <Badge variant="outline" size="sm">{insight.affected_count.toLocaleString()} affected</Badge>
           )}
         </Group>
       </Group>
-
       <Text size="sm" c="dimmed">{insight.description}</Text>
-
       {insight.indicators && insight.indicators.length > 0 && (
         <Stack gap={4} mt="sm">
           {insight.indicators.slice(0, 4).map((ind, i) => (
@@ -201,7 +309,6 @@ function InsightCard({ insight }: { insight: Insight }) {
           ))}
         </Stack>
       )}
-
       {insight.validation && (
         <Badge mt="sm" size="xs" variant="outline"
           color={insight.validation.status === 'confirmed' ? 'green' : insight.validation.status === 'adjusted' ? 'yellow' : 'red'}>
@@ -212,27 +319,23 @@ function InsightCard({ insight }: { insight: Insight }) {
   );
 }
 
+// --- Recommendation Card ---
+
 function RecommendationCard({ rec }: { rec: Recommendation }) {
   const priorityColor = rec.priority >= 5 ? 'red' : rec.priority >= 4 ? 'orange' : 'blue';
-
   return (
     <Card withBorder p="md" radius="md" style={{ borderLeft: `4px solid var(--mantine-color-${priorityColor}-6)` }}>
       <Group justify="space-between" mb="xs">
         <Text fw={600}>{rec.title}</Text>
         <Badge color={priorityColor} variant="light" size="sm">P{rec.priority}</Badge>
       </Group>
-
       <Text size="sm" c="dimmed" mb="sm">{rec.description}</Text>
-
       {rec.expected_impact && (
         <Group gap="xs" mb="sm">
           <IconTrendingUp size={14} />
-          <Text size="xs" c="dimmed">
-            {rec.expected_impact.metric}: {rec.expected_impact.estimated_improvement}
-          </Text>
+          <Text size="xs" c="dimmed">{rec.expected_impact.metric}: {rec.expected_impact.estimated_improvement}</Text>
         </Group>
       )}
-
       {rec.actions && rec.actions.length > 0 && (
         <Stack gap={4}>
           {rec.actions.slice(0, 3).map((action, i) => (

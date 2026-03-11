@@ -14,12 +14,13 @@ func New(db *database.DB) http.Handler {
 	// Repos
 	projectRepo := database.NewProjectRepository(db)
 	discoveryRepo := database.NewDiscoveryRepository(db)
+	runRepo := database.NewRunRepository(db)
 
 	// Handlers
 	providers := handler.NewProvidersHandler()
 	domains := handler.NewDomainsHandler()
 	projects := handler.NewProjectsHandler(projectRepo)
-	discoveries := handler.NewDiscoveriesHandler(discoveryRepo, projectRepo)
+	discoveries := handler.NewDiscoveriesHandler(discoveryRepo, projectRepo, runRepo)
 
 	// Health
 	mux.HandleFunc("GET /api/v1/health", handler.HealthCheck)
@@ -47,6 +48,9 @@ func New(db *database.DB) http.Handler {
 	mux.HandleFunc("GET /api/v1/projects/{id}/discoveries/latest", discoveries.GetLatest)
 	mux.HandleFunc("GET /api/v1/projects/{id}/discoveries/{date}", discoveries.GetByDate)
 	mux.HandleFunc("GET /api/v1/projects/{id}/status", discoveries.GetStatus)
+
+	// Runs (live status)
+	mux.HandleFunc("GET /api/v1/runs/{runId}", discoveries.GetRun)
 
 	// CORS middleware for dashboard
 	return corsMiddleware(mux)

@@ -33,7 +33,8 @@ type Orchestrator struct {
 	userCountValidator   *validation.UserCountValidator
 	insightValidator     *validation.InsightValidator
 
-	debugLogger *debug.Logger
+	debugLogger    *debug.Logger
+	statusReporter *StatusReporter
 
 	projectID   string
 	domain      string
@@ -52,6 +53,9 @@ type OrchestratorOptions struct {
 	ContextRepo   *database.ContextRepository
 	DiscoveryRepo *database.DiscoveryRepository
 	DebugLogRepo  *database.DebugLogRepository
+
+	RunRepo         *database.RunRepository
+	RunID           string // if set, agent writes live status to this run
 
 	ProjectID       string
 	Domain          string
@@ -103,6 +107,9 @@ func NewOrchestrator(opts OrchestratorOptions) *Orchestrator {
 		})
 	}
 
+	// Status reporter for live updates
+	statusReporter := NewStatusReporter(opts.RunRepo, opts.RunID)
+
 	return &Orchestrator{
 		aiClient:           opts.AIClient,
 		warehouse:          opts.Warehouse,
@@ -111,6 +118,7 @@ func NewOrchestrator(opts OrchestratorOptions) *Orchestrator {
 		discoveryRepo:      opts.DiscoveryRepo,
 		debugLogRepo:       opts.DebugLogRepo,
 		debugLogger:        debugLogger,
+		statusReporter:     statusReporter,
 		userCountValidator: ucValidator,
 		insightValidator:   insightVal,
 		projectID:          opts.ProjectID,
@@ -175,6 +183,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	// Phase 1: Load project context
 	applog.Info("Phase 1: Loading project context")
+	o.statusReporter.SetPhase(ctx, models.PhaseInit, "Loading project context...", 5)
 	projectCtx, err := o.loadProjectContext(ctx)
 	if err != nil {
 		applog.WithError(err).Warn("Failed to load project context, starting fresh")
@@ -183,6 +192,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	// Phase 2: Schema discovery
 	applog.Info("Phase 2: Discovering schemas")
+	o.statusReporter.SetPhase(ctx, models.PhaseSchemaDiscovery, "Discovering warehouse table schemas...", 8)
 	schemas, err := o.discoverSchemas(ctx, projectCtx, opts.SkipSchemaCache)
 	if err != nil {
 		return nil, fmt.Errorf("schema discovery failed: %w", err)
@@ -207,6 +217,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	// Phase 3: Autonomous exploration
 	applog.Info("Phase 3: Running autonomous exploration")
+	o.statusReporter.SetPhase(ctx, models.PhaseExploration, "Starting autonomous data exploration...", 10)
 	o.explorationEngine = ai.NewExplorationEngine(ai.ExplorationEngineOptions{
 		Client:   o.aiClient,
 		Executor: executor,
@@ -226,6 +237,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	// Phase 4: Analysis by area (dynamic from domain pack)
 	applog.Info("Phase 4: Running analysis by area")
+	o.statusReporter.SetPhase(ctx, models.PhaseAnalysis, "Analyzing discoveries by category...", 65)
 	allInsights := make([]models.Insight, 0)
 	analysisLog := make([]models.AnalysisStep, 0)
 
@@ -312,6 +324,12 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 		analysisLog = append(analysisLog, step)
 		allInsights = append(allInsights, insights...)
 
+		// Report analysis completion and insights to status
+		o.statusReporter.AddAnalysisStep(ctx, area.ID, area.Name, len(insights), "")
+		for _, insight := range insights {
+			o.statusReporter.AddInsightStep(ctx, insight.Name, insight.Severity, area.ID)
+		}
+
 		applog.WithFields(applog.Fields{
 			"area":     area.ID,
 			"insights": len(insights),
@@ -320,6 +338,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	// Phase 5: Generate recommendations
 	applog.Info("Phase 5: Generating recommendations")
+	o.statusReporter.SetPhase(ctx, models.PhaseRecommendations, "Generating actionable recommendations...", 85)
 	recommendations, recStep := o.generateRecommendations(ctx, prompts.Recommendations, allInsights, profileJSON, dataset)
 
 	// Validate recommendation segment sizes
@@ -337,6 +356,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 
 	// Phase 7: Save discovery result
 	applog.Info("Phase 7: Saving discovery result")
+	o.statusReporter.SetPhase(ctx, models.PhaseSaving, "Saving discovery results...", 95)
 
 	// Merge all validation results
 	allValidation := make([]models.ValidationResult, 0)
@@ -372,6 +392,9 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 	if err := o.discoveryRepo.Save(ctx, result); err != nil {
 		return nil, fmt.Errorf("failed to save discovery result: %w", err)
 	}
+
+	// Mark run as completed
+	o.statusReporter.Complete(ctx, len(allInsights))
 
 	applog.WithFields(applog.Fields{
 		"project_id":      o.projectID,

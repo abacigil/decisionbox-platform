@@ -217,5 +217,6 @@ func (w *queryWrapper) GetTableSchema(ctx context.Context, table string) (*gowar
 func (w *queryWrapper) GetDataset() string      { return w.provider.GetDataset() }
 func (w *queryWrapper) SQLDialect() string      { return w.provider.SQLDialect() }
 func (w *queryWrapper) SQLFixPrompt() string    { return w.provider.SQLFixPrompt() }
+func (w *queryWrapper) ValidateReadOnly(ctx context.Context) error { return nil }
 func (w *queryWrapper) HealthCheck(ctx context.Context) error { return nil }
 func (w *queryWrapper) Close() error            { return nil }

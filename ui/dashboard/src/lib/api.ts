@@ -152,11 +152,12 @@ export interface Summary {
 
 export interface ProjectStatus {
   project_id: string;
-  status: string;
-  last_run_at: string | null;
-  last_run_status: string;
-  last_discovery_date?: string;
-  last_insights_count?: number;
+  run?: DiscoveryRunStatus;
+  last_discovery?: {
+    date: string;
+    insights_count: number;
+    total_steps: number;
+  };
 }
 
 export interface ProviderMeta {
@@ -174,6 +175,41 @@ export interface ConfigField {
   type: string;
   default: string;
   placeholder: string;
+}
+
+export interface DiscoveryRunStatus {
+  id: string;
+  project_id: string;
+  status: string; // pending, running, completed, failed
+  phase: string;
+  phase_detail: string;
+  progress: number; // 0-100
+  started_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  error: string;
+  steps: RunStep[];
+  total_queries: number;
+  successful_queries: number;
+  failed_queries: number;
+  insights_found: number;
+}
+
+export interface RunStep {
+  phase: string;
+  step_num: number;
+  timestamp: string;
+  type: string; // phase_start, query, analysis, insight, error, info
+  message: string;
+  llm_thinking: string;
+  query: string;
+  query_result: string;
+  row_count: number;
+  query_time_ms: number;
+  query_fixed: boolean;
+  insight_name: string;
+  insight_severity: string;
+  error: string;
 }
 
 // --- API Functions ---
@@ -203,7 +239,9 @@ export const api = {
 
   // Discovery
   triggerDiscovery: (projectId: string) =>
-    request<{ status: string; message: string }>(`/api/v1/projects/${projectId}/discover`, { method: 'POST' }),
+    request<{ status: string; message: string; run_id?: string }>(`/api/v1/projects/${projectId}/discover`, { method: 'POST' }),
+  getRun: (runId: string) =>
+    request<DiscoveryRunStatus>(`/api/v1/runs/${runId}`),
   listDiscoveries: (projectId: string) =>
     request<DiscoveryResult[]>(`/api/v1/projects/${projectId}/discoveries`),
   getLatestDiscovery: (projectId: string) =>
