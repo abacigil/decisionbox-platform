@@ -30,6 +30,7 @@ export default function ProjectPage() {
   const [estimate, setEstimate] = useState<CostEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [pendingAreas, setPendingAreas] = useState<string[] | undefined>(undefined);
+  const [estimateFirst, setEstimateFirst] = useState(false);
   const dismissedRunId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -72,6 +73,14 @@ export default function ProjectPage() {
 
   // Initial poll on mount
   useEffect(() => { pollStatus(); }, []);
+
+  const handleRun = (areas?: string[]) => {
+    if (estimateFirst) {
+      handleEstimate(areas);
+    } else {
+      handleTrigger(areas);
+    }
+  };
 
   const handleEstimate = async (areas?: string[]) => {
     setEstimating(true);
@@ -145,7 +154,7 @@ export default function ProjectPage() {
                 <Button leftSection={<IconPlayerPlay size={16} />}
                   rightSection={<IconChevronDown size={14} />}
                   loading={triggering || estimating} disabled={!!isRunning}>
-                  {isRunning ? 'Running...' : estimating ? 'Estimating...' : 'Run Discovery'}
+                  {isRunning ? 'Running...' : 'Run Discovery'}
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
@@ -154,8 +163,13 @@ export default function ProjectPage() {
                   <NumberInput size="xs" value={maxSteps} onChange={(v) => setMaxSteps(Number(v) || 100)}
                     min={5} max={500} step={5} description="More steps = more comprehensive" />
                 </div>
+                <Menu.Item closeMenuOnClick={false}>
+                  <Checkbox label="Estimate cost before running" size="xs"
+                    checked={estimateFirst}
+                    onChange={(e) => setEstimateFirst(e.currentTarget.checked)} />
+                </Menu.Item>
                 <Menu.Divider />
-                <Menu.Item onClick={() => handleEstimate()}>Run All Areas</Menu.Item>
+                <Menu.Item onClick={() => handleRun()}>Run All Areas</Menu.Item>
                 <Menu.Divider />
                 <Menu.Label>Select areas</Menu.Label>
                 {analysisAreas.map((area) => (
@@ -170,7 +184,7 @@ export default function ProjectPage() {
                 {selectedAreas.length > 0 && (
                   <>
                     <Menu.Divider />
-                    <Menu.Item color="blue" onClick={() => handleEstimate(selectedAreas)}>
+                    <Menu.Item color="blue" onClick={() => handleRun(selectedAreas)}>
                       Run Selected ({selectedAreas.length})
                     </Menu.Item>
                   </>
