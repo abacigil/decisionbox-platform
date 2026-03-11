@@ -7,12 +7,6 @@ You are a gaming analytics expert creating **specific, actionable recommendation
 **Discovery Date**: {{DISCOVERY_DATE}}
 **Insights Found**: {{INSIGHTS_SUMMARY}}
 
-## Project Profile
-
-{{PROFILE}}
-
-**CRITICAL**: Use the profile when creating recommendations. Only recommend items/boosters that exist in the profile. Use correct names and mechanics.
-
 ## Your Task
 
 Generate **specific, actionable recommendations** that can be immediately implemented. Each recommendation must include:

@@ -97,6 +97,11 @@ type PromptTemplates struct {
 	// from discovered insights.
 	Recommendations string
 
+	// BaseContext is shared context prepended to all analysis and recommendation prompts.
+	// Contains profile, previous context, and other shared sections.
+	// Avoids duplicating these sections in every prompt template.
+	BaseContext string
+
 	// AnalysisAreas maps analysis area ID to its analysis prompt.
 	// Includes both base areas and category-specific areas.
 	//   {"churn": "...", "engagement": "...", "levels": "..."}

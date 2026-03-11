@@ -78,22 +78,56 @@ func TestBuildPreviousContext(t *testing.T) {
 	o := &Orchestrator{}
 
 	// No context
-	if o.buildPreviousContext(nil) != "" {
+	if o.buildPreviousContext(nil, nil, nil, nil) != "" {
 		t.Error("nil context should return empty")
 	}
 
 	// Empty context
 	ctx := models.NewProjectContext("test")
-	if o.buildPreviousContext(ctx) != "" {
+	if o.buildPreviousContext(ctx, nil, nil, nil) != "" {
 		t.Error("empty context should return empty")
 	}
 
 	// Context with discoveries
 	ctx.TotalDiscoveries = 5
 	ctx.AddNote("schema", "sessions table has user_id", 0.9)
-	result := o.buildPreviousContext(ctx)
+	result := o.buildPreviousContext(ctx, nil, nil, nil)
 	if result == "" {
 		t.Error("should return context when discoveries exist")
+	}
+
+	// Context with previous insights
+	prevInsights := []models.InsightSummary{
+		{Name: "High Churn at Level 45", AnalysisArea: "churn", Severity: "critical", AffectedCount: 500, Date: "2026-03-10"},
+	}
+	result = o.buildPreviousContext(ctx, prevInsights, nil, nil)
+	if !contains(result, "High Churn at Level 45") {
+		t.Error("should include previous insights")
+	}
+	if !contains(result, "Do NOT repeat") {
+		t.Error("should include dedup instruction")
+	}
+
+	// Context with feedback
+	feedback := []models.FeedbackSummary{
+		{InsightName: "Bad Insight", Rating: "dislike", Comment: "not actionable"},
+		{InsightName: "Good Insight", Rating: "like"},
+	}
+	result = o.buildPreviousContext(ctx, nil, nil, feedback)
+	if !contains(result, "Bad Insight") || !contains(result, "not actionable") {
+		t.Error("should include disliked feedback with comment")
+	}
+	if !contains(result, "Good Insight") {
+		t.Error("should include liked feedback")
+	}
+
+	// Context with previous recommendations
+	prevRecs := []models.RecommendationSummary{
+		{Title: "Send Extra Lives", Category: "churn", Priority: 1},
+	}
+	result = o.buildPreviousContext(ctx, nil, prevRecs, nil)
+	if !contains(result, "Send Extra Lives") {
+		t.Error("should include previous recommendations")
 	}
 }
 

@@ -7,12 +7,6 @@ You are a gaming analytics expert analyzing booster/power-up usage patterns in a
 **Dataset**: {{DATASET}}
 **Exploration Queries**: {{TOTAL_QUERIES}}
 
-## Project Profile
-
-{{PROFILE}}
-
-**IMPORTANT**: Use the profile to understand the available boosters, their mechanics, and monetization model.
-
 ## Your Task
 
 Analyze the query results and identify **booster usage patterns** that reveal opportunities or problems.

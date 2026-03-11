@@ -96,6 +96,9 @@ func (p *GamingPack) Prompts(categoryID string) domainpack.PromptTemplates {
 		}
 	}
 
+	// Load base context (shared across analysis + recommendations)
+	templates.BaseContext = readPromptFile(filepath.Join(getPromptsPath(), "base", "base_context.md"))
+
 	// Load recommendations prompt
 	templates.Recommendations = readPromptFile(filepath.Join(getPromptsPath(), "base", "recommendations.md"))
 

@@ -51,6 +51,38 @@ func (r *DiscoveryRepository) GetLatest(ctx context.Context, projectID string) (
 	return &result, nil
 }
 
+// ListRecent returns the last N discoveries for a project (lightweight — only summary fields).
+func (r *DiscoveryRepository) ListRecent(ctx context.Context, projectID string, limit int) ([]*models.DiscoveryResult, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	filter := bson.M{"project_id": projectID}
+	opts := options.Find().
+		SetSort(bson.D{{Key: "discovery_date", Value: -1}}).
+		SetLimit(int64(limit)).
+		SetProjection(bson.M{
+			"project_id":     1,
+			"discovery_date": 1,
+			"run_type":       1,
+			"areas_requested": 1,
+			"insights":       1,
+			"recommendations": 1,
+			"summary":        1,
+		})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("list recent discoveries: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	results := make([]*models.DiscoveryResult, 0)
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, fmt.Errorf("decode recent discoveries: %w", err)
+	}
+	return results, nil
+}
+
 // EnsureIndexes creates necessary indexes.
 func (r *DiscoveryRepository) EnsureIndexes(ctx context.Context) error {
 	indexes := []mongo.IndexModel{

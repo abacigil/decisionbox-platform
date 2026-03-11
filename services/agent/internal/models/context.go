@@ -124,3 +124,63 @@ func (ctx *ProjectContext) RecordDiscovery(success bool) {
 		ctx.ConsecutiveFailures++
 	}
 }
+
+// UpdatePatterns merges new insights into historical patterns.
+// Tracks seen count and updates status.
+func (ctx *ProjectContext) UpdatePatterns(insights []Insight) {
+	existing := make(map[string]*HistoricalPattern)
+	for i := range ctx.HistoricalPatterns {
+		existing[ctx.HistoricalPatterns[i].PatternID] = &ctx.HistoricalPatterns[i]
+	}
+
+	now := time.Now()
+	for _, ins := range insights {
+		// Use analysis_area:name as pattern ID
+		pid := ins.AnalysisArea + ":" + ins.Name
+		if p, ok := existing[pid]; ok {
+			p.SeenCount++
+			p.LastSeen = now
+			p.Status = "recurring"
+		} else {
+			ctx.HistoricalPatterns = append(ctx.HistoricalPatterns, HistoricalPattern{
+				PatternID:    pid,
+				AnalysisArea: ins.AnalysisArea,
+				Name:         ins.Name,
+				Description:  ins.Description,
+				FirstSeen:    now,
+				LastSeen:     now,
+				SeenCount:    1,
+				Status:       "active",
+			})
+		}
+	}
+
+	// Keep last 200 patterns
+	if len(ctx.HistoricalPatterns) > 200 {
+		ctx.HistoricalPatterns = ctx.HistoricalPatterns[len(ctx.HistoricalPatterns)-200:]
+	}
+	ctx.UpdatedAt = now
+}
+
+// InsightSummary is a compact representation of a previous insight for LLM context.
+type InsightSummary struct {
+	Name          string `json:"name"`
+	AnalysisArea  string `json:"analysis_area"`
+	Severity      string `json:"severity"`
+	AffectedCount int    `json:"affected_count"`
+	Date          string `json:"date"`
+}
+
+// FeedbackSummary is a compact representation of user feedback for LLM context.
+type FeedbackSummary struct {
+	InsightName string `json:"insight_name"`
+	Rating      string `json:"rating"`
+	Comment     string `json:"comment,omitempty"`
+}
+
+// RecommendationSummary is a compact representation of a previous recommendation.
+type RecommendationSummary struct {
+	Title    string `json:"title"`
+	Category string `json:"category"`
+	Priority int    `json:"priority"`
+}

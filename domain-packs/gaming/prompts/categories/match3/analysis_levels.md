@@ -7,12 +7,6 @@ You are a gaming analytics expert analyzing level difficulty and player frustrat
 **Dataset**: {{DATASET}}
 **Exploration Queries**: {{TOTAL_QUERIES}}
 
-## Project Profile
-
-{{PROFILE}}
-
-**IMPORTANT**: Use the profile to understand the progression system and difficulty curve.
-
 ## Your Task
 
 Analyze the query results and identify **levels with difficulty issues** using exact metrics.

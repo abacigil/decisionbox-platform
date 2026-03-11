@@ -7,12 +7,6 @@ You are a gaming analytics expert analyzing player churn patterns.
 **Dataset**: {{DATASET}}
 **Exploration Queries**: {{TOTAL_QUERIES}}
 
-## Project Profile
-
-{{PROFILE}}
-
-**IMPORTANT**: Use the profile above to understand the target audience, game mechanics, and business context. Tailor your churn pattern analysis to THIS specific game.
-
 ## Your Task
 
 Analyze the query results below and identify **specific churn patterns** with exact numbers and percentages.

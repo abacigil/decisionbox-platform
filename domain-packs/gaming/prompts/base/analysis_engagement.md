@@ -7,12 +7,6 @@ You are a gaming analytics expert analyzing player engagement patterns and trend
 **Dataset**: {{DATASET}}
 **Exploration Queries**: {{TOTAL_QUERIES}}
 
-## Project Profile
-
-{{PROFILE}}
-
-**IMPORTANT**: Use the profile above to understand the target audience, session patterns, and engagement features. Tailor your analysis to THIS specific game.
-
 ## Your Task
 
 Analyze the query results below and identify **significant engagement trends** with exact metrics.

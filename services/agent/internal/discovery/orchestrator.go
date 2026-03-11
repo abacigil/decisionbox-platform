@@ -26,6 +26,7 @@ type Orchestrator struct {
 
 	contextRepo   *database.ContextRepository
 	discoveryRepo *database.DiscoveryRepository
+	feedbackRepo  *database.FeedbackRepository
 	debugLogRepo  *database.DebugLogRepository
 
 	schemaDiscovery      *SchemaDiscovery
@@ -54,6 +55,7 @@ type OrchestratorOptions struct {
 
 	ContextRepo   *database.ContextRepository
 	DiscoveryRepo *database.DiscoveryRepository
+	FeedbackRepo  *database.FeedbackRepository
 	DebugLogRepo  *database.DebugLogRepository
 
 	RunRepo         *database.RunRepository
@@ -112,6 +114,7 @@ func NewOrchestrator(opts OrchestratorOptions) *Orchestrator {
 		discoveryPack:      opts.DiscoveryPack,
 		contextRepo:        opts.ContextRepo,
 		discoveryRepo:      opts.DiscoveryRepo,
+		feedbackRepo:       opts.FeedbackRepo,
 		debugLogRepo:       opts.DebugLogRepo,
 		debugLogger:        debugLogger,
 		statusReporter:     statusReporter,
@@ -200,7 +203,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 		Filter:    filterClause,
 	})
 
-	// Phase 1: Load project context
+	// Phase 1: Load project context + previous discoveries + feedback
 	applog.Info("Phase 1: Loading project context")
 	o.statusReporter.SetPhase(ctx, models.PhaseInit, "Loading project context...", 5)
 	projectCtx, err := o.loadProjectContext(ctx)
@@ -208,6 +211,16 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 		applog.WithError(err).Warn("Failed to load project context, starting fresh")
 		projectCtx = models.NewProjectContext(o.projectID)
 	}
+
+	// Load previous discoveries and feedback for context awareness
+	prevInsights, prevRecs, feedbackSummaries := o.loadPreviousDiscoveryContext(ctx)
+	applog.WithFields(applog.Fields{
+		"prev_insights":  len(prevInsights),
+		"prev_recs":      len(prevRecs),
+		"feedback_items": len(feedbackSummaries),
+	}).Info("Previous context loaded")
+
+	previousContextStr := o.buildPreviousContext(projectCtx, prevInsights, prevRecs, feedbackSummaries)
 
 	// Phase 2: Schema discovery
 	applog.Info("Phase 2: Discovering schemas")
@@ -235,8 +248,13 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 	explorationPrompt = strings.ReplaceAll(explorationPrompt, "{{FILTER_CONTEXT}}", o.buildFilterContext())
 	explorationPrompt = strings.ReplaceAll(explorationPrompt, "{{FILTER_RULE}}", o.buildFilterRule())
 	explorationPrompt = strings.ReplaceAll(explorationPrompt, "{{PROFILE}}", profileStr)
-	explorationPrompt = strings.ReplaceAll(explorationPrompt, "{{PREVIOUS_CONTEXT}}", o.buildPreviousContext(projectCtx))
+	explorationPrompt = strings.ReplaceAll(explorationPrompt, "{{PREVIOUS_CONTEXT}}", previousContextStr)
 	explorationPrompt = strings.ReplaceAll(explorationPrompt, "{{ANALYSIS_AREAS}}", areasDesc)
+
+	// Prepare base context for analysis + recommendation prompts (substituted once, prepended to each)
+	baseContext := prompts.BaseContext
+	baseContext = strings.ReplaceAll(baseContext, "{{PROFILE}}", profileStr)
+	baseContext = strings.ReplaceAll(baseContext, "{{PREVIOUS_CONTEXT}}", previousContextStr)
 
 	// Phase 3: Autonomous exploration
 	applog.Info("Phase 3: Running autonomous exploration")
@@ -308,12 +326,11 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 			"queries": len(relevantQueries),
 		}).Info("Analyzing area")
 
-		// Prepare analysis prompt
+		// Prepare analysis prompt: base context + area-specific prompt
 		queryResultsJSON, _ := json.MarshalIndent(relevantQueries, "", "  ")
-		prompt := areaPrompt
+		prompt := baseContext + "\n\n" + areaPrompt
 		prompt = strings.ReplaceAll(prompt, "{{DATASET}}", datasetsStr)
 		prompt = strings.ReplaceAll(prompt, "{{TOTAL_QUERIES}}", fmt.Sprintf("%d", len(relevantQueries)))
-		prompt = strings.ReplaceAll(prompt, "{{PROFILE}}", profileStr)
 		prompt = strings.ReplaceAll(prompt, "{{QUERY_RESULTS}}", string(queryResultsJSON))
 
 		// Create analysis step to capture full dialog
@@ -392,7 +409,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 	// Phase 5: Generate recommendations
 	applog.Info("Phase 5: Generating recommendations")
 	o.statusReporter.SetPhase(ctx, models.PhaseRecommendations, "Generating actionable recommendations...", 85)
-	recommendations, recStep := o.generateRecommendations(ctx, prompts.Recommendations, allInsights, profileStr, datasetsStr)
+	recommendations, recStep := o.generateRecommendations(ctx, prompts.Recommendations, allInsights, baseContext, datasetsStr)
 
 	// Validate recommendation segment sizes
 	var recValidationResults []models.ValidationResult
@@ -400,9 +417,10 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 		recValidationResults = o.userCountValidator.ValidateRecommendations(ctx, recommendations)
 	}
 
-	// Phase 6: Update project context
+	// Phase 6: Update project context with discovered patterns
 	applog.Info("Phase 6: Updating project context")
 	projectCtx.RecordDiscovery(true)
+	projectCtx.UpdatePatterns(allInsights)
 	if err := o.saveProjectContext(ctx, projectCtx); err != nil {
 		applog.WithError(err).Warn("Failed to save project context")
 	}
@@ -488,7 +506,7 @@ func (o *Orchestrator) generateRecommendations(
 	ctx context.Context,
 	promptTemplate string,
 	insights []models.Insight,
-	profileStr string,
+	baseContext string,
 	datasetsStr string,
 ) ([]models.Recommendation, *models.RecommendationStep) {
 	step := &models.RecommendationStep{
@@ -513,10 +531,9 @@ func (o *Orchestrator) generateRecommendations(
 	}
 	summary := fmt.Sprintf("Total: %d insights (%s)", len(insights), strings.Join(parts, ", "))
 
-	prompt := promptTemplate
+	prompt := baseContext + "\n\n" + promptTemplate
 	prompt = strings.ReplaceAll(prompt, "{{DISCOVERY_DATE}}", time.Now().Format("2006-01-02"))
 	prompt = strings.ReplaceAll(prompt, "{{INSIGHTS_SUMMARY}}", summary)
-	prompt = strings.ReplaceAll(prompt, "{{PROFILE}}", profileStr)
 	prompt = strings.ReplaceAll(prompt, "{{INSIGHTS_DATA}}", string(insightsJSON))
 
 	step.Prompt = prompt
@@ -652,7 +669,14 @@ func (o *Orchestrator) buildAnalysisAreasDescription(areas []domainpack.Analysis
 	return sb.String()
 }
 
-func (o *Orchestrator) buildPreviousContext(pctx *models.ProjectContext) string {
+// buildPreviousContext builds a rich context from previous discoveries and user feedback.
+// This prevents duplicate insights, respects user feedback, and helps the LLM focus on new findings.
+func (o *Orchestrator) buildPreviousContext(
+	pctx *models.ProjectContext,
+	prevInsights []models.InsightSummary,
+	prevRecs []models.RecommendationSummary,
+	feedback []models.FeedbackSummary,
+) string {
 	if pctx == nil || pctx.TotalDiscoveries == 0 {
 		return ""
 	}
@@ -660,10 +684,65 @@ func (o *Orchestrator) buildPreviousContext(pctx *models.ProjectContext) string 
 	var sb strings.Builder
 	sb.WriteString("## Previous Discovery Context\n\n")
 	sb.WriteString(fmt.Sprintf("This is discovery run #%d. ", pctx.TotalDiscoveries+1))
-	sb.WriteString(fmt.Sprintf("Last discovery: %s.\n", pctx.LastDiscoveryDate.Format("2006-01-02")))
+	sb.WriteString(fmt.Sprintf("Last discovery: %s.\n\n", pctx.LastDiscoveryDate.Format("2006-01-02")))
 
+	// Previous insights
+	if len(prevInsights) > 0 {
+		sb.WriteString("### Previously Found Insights\n")
+		sb.WriteString("These insights were already discovered. Do NOT repeat them unless the data has significantly changed. Focus on new patterns.\n\n")
+		for _, ins := range prevInsights {
+			sb.WriteString(fmt.Sprintf("- **%s** [%s, %s] — %d affected (%s)\n",
+				ins.Name, ins.AnalysisArea, ins.Severity, ins.AffectedCount, ins.Date))
+		}
+		sb.WriteString("\n")
+	}
+
+	// User feedback
+	disliked := make([]models.FeedbackSummary, 0)
+	liked := make([]models.FeedbackSummary, 0)
+	for _, f := range feedback {
+		if f.Rating == "dislike" {
+			disliked = append(disliked, f)
+		} else {
+			liked = append(liked, f)
+		}
+	}
+
+	if len(disliked) > 0 {
+		sb.WriteString("### User Feedback — Disliked Insights (AVOID)\n")
+		sb.WriteString("The user marked these insights as NOT useful. Avoid similar conclusions or address the feedback.\n\n")
+		for _, f := range disliked {
+			if f.Comment != "" {
+				sb.WriteString(fmt.Sprintf("- **%s** — user comment: \"%s\"\n", f.InsightName, f.Comment))
+			} else {
+				sb.WriteString(fmt.Sprintf("- **%s** — marked not useful\n", f.InsightName))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(liked) > 0 {
+		sb.WriteString("### User Feedback — Liked Insights (MONITOR)\n")
+		sb.WriteString("The user found these valuable. Check if they have changed or evolved.\n\n")
+		for _, f := range liked {
+			sb.WriteString(fmt.Sprintf("- **%s**\n", f.InsightName))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Previous recommendations
+	if len(prevRecs) > 0 {
+		sb.WriteString("### Previously Given Recommendations\n")
+		sb.WriteString("Don't repeat these unless the situation has changed.\n\n")
+		for _, rec := range prevRecs {
+			sb.WriteString(fmt.Sprintf("- P%d: %s (%s)\n", rec.Priority, rec.Title, rec.Category))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Key learnings from notes
 	if len(pctx.Notes) > 0 {
-		sb.WriteString("\n### Key Learnings\n")
+		sb.WriteString("### Key Learnings\n")
 		shown := 0
 		for i := len(pctx.Notes) - 1; i >= 0 && shown < 10; i-- {
 			note := pctx.Notes[i]
@@ -702,6 +781,109 @@ func (o *Orchestrator) loadProjectContext(ctx context.Context) (*models.ProjectC
 
 func (o *Orchestrator) saveProjectContext(ctx context.Context, pctx *models.ProjectContext) error {
 	return o.contextRepo.Save(ctx, pctx)
+}
+
+// loadPreviousDiscoveryContext fetches recent discoveries + feedback and builds compact summaries.
+func (o *Orchestrator) loadPreviousDiscoveryContext(ctx context.Context) (
+	[]models.InsightSummary, []models.RecommendationSummary, []models.FeedbackSummary,
+) {
+	// Load last 5 discoveries
+	recentDiscoveries, err := o.discoveryRepo.ListRecent(ctx, o.projectID, 5)
+	if err != nil {
+		applog.WithError(err).Warn("Failed to load recent discoveries for context")
+		return nil, nil, nil
+	}
+
+	if len(recentDiscoveries) == 0 {
+		return nil, nil, nil
+	}
+
+	// Build insight summaries (deduped by name)
+	seenInsights := make(map[string]bool)
+	insightSummaries := make([]models.InsightSummary, 0)
+	recSummaries := make([]models.RecommendationSummary, 0)
+	seenRecs := make(map[string]bool)
+
+	for _, disc := range recentDiscoveries {
+		dateStr := disc.DiscoveryDate.Format("2006-01-02")
+		for _, ins := range disc.Insights {
+			key := ins.AnalysisArea + ":" + ins.Name
+			if seenInsights[key] {
+				continue
+			}
+			seenInsights[key] = true
+			insightSummaries = append(insightSummaries, models.InsightSummary{
+				Name:          ins.Name,
+				AnalysisArea:  ins.AnalysisArea,
+				Severity:      ins.Severity,
+				AffectedCount: ins.AffectedCount,
+				Date:          dateStr,
+			})
+		}
+		for _, rec := range disc.Recommendations {
+			if seenRecs[rec.Title] {
+				continue
+			}
+			seenRecs[rec.Title] = true
+			recSummaries = append(recSummaries, models.RecommendationSummary{
+				Title:    rec.Title,
+				Category: rec.Category,
+				Priority: rec.Priority,
+			})
+		}
+	}
+
+	// Load feedback for these discoveries
+	feedbackSummaries := make([]models.FeedbackSummary, 0)
+	if o.feedbackRepo != nil {
+		discoveryIDs := make([]string, 0, len(recentDiscoveries))
+		for _, d := range recentDiscoveries {
+			if d.ID != "" {
+				discoveryIDs = append(discoveryIDs, d.ID)
+			}
+		}
+
+		fbEntries, err := o.feedbackRepo.ListByDiscoveryIDs(ctx, discoveryIDs)
+		if err != nil {
+			applog.WithError(err).Warn("Failed to load feedback for context")
+		} else {
+			// Build insight name lookup from discoveries
+			insightNameByKey := make(map[string]string)
+			for _, disc := range recentDiscoveries {
+				for i, ins := range disc.Insights {
+					insightNameByKey[disc.ID+":insight:"+fmt.Sprintf("%d", i)] = ins.Name
+					if ins.ID != "" {
+						insightNameByKey[disc.ID+":insight:"+ins.ID] = ins.Name
+					}
+				}
+				for i, rec := range disc.Recommendations {
+					insightNameByKey[disc.ID+":recommendation:"+fmt.Sprintf("%d", i)] = rec.Title
+				}
+			}
+
+			for _, fb := range fbEntries {
+				name := insightNameByKey[fb.DiscoveryID+":"+fb.TargetType+":"+fb.TargetID]
+				if name == "" {
+					name = fb.TargetType + " #" + fb.TargetID
+				}
+				feedbackSummaries = append(feedbackSummaries, models.FeedbackSummary{
+					InsightName: name,
+					Rating:      fb.Rating,
+					Comment:     fb.Comment,
+				})
+			}
+		}
+	}
+
+	// Cap summaries to avoid prompt bloat
+	if len(insightSummaries) > 30 {
+		insightSummaries = insightSummaries[:30]
+	}
+	if len(recSummaries) > 15 {
+		recSummaries = recSummaries[:15]
+	}
+
+	return insightSummaries, recSummaries, feedbackSummaries
 }
 
 func (o *Orchestrator) discoverSchemas(ctx context.Context, pctx *models.ProjectContext, skipCache bool) (map[string]models.TableSchema, error) {

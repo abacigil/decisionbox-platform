@@ -12,6 +12,7 @@ const (
 	CollectionDiscoveries    = "discoveries"
 	CollectionProjectContext = "project_context"
 	CollectionDebugLogs      = "discovery_debug_logs"
+	CollectionFeedback       = "feedback"
 )
 
 // DB wraps go-common's MongoDB client.

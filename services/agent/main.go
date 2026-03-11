@@ -202,6 +202,7 @@ func runDiscovery(cfg *config.Config, projectID string, runID string, selectedAr
 		DiscoveryPack:   dp,
 		ContextRepo:     contextRepo,
 		DiscoveryRepo:   discoveryRepo,
+		FeedbackRepo:    database.NewFeedbackRepository(db),
 		DebugLogRepo:    debugLogRepo,
 		RunRepo:         runRepo,
 		RunID:           runID,
