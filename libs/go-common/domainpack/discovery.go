@@ -65,9 +65,9 @@ type DiscoveryPack interface {
 //	Gaming: {ID: "match3", Name: "Match-3", Description: "Puzzle games with match-3 mechanics"}
 //	Ecommerce: {ID: "b2c", Name: "B2C Retail", Description: "Direct-to-consumer retail"}
 type DomainCategory struct {
-	ID          string // unique key within domain: "match3", "fps", "b2c"
-	Name        string // display name: "Match-3", "FPS / Shooter", "B2C Retail"
-	Description string // short description for UI/docs
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // AnalysisArea defines a type of insight that the discovery agent looks for.
@@ -76,12 +76,12 @@ type DomainCategory struct {
 // relevant for all game genres). Category-specific areas are only relevant
 // for that category (e.g., level_difficulty for puzzle games).
 type AnalysisArea struct {
-	ID          string   // unique key: "churn", "levels", "weapon_balance"
-	Name        string   // display name: "Churn Risks", "Level Difficulty"
-	Description string   // what this area looks for
-	Keywords    []string // keywords to filter exploration queries into this area
-	IsBase      bool     // true = shared across all categories in the domain
-	Priority    int      // display order (1 = highest priority)
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Keywords    []string `json:"keywords"`
+	IsBase      bool     `json:"is_base"`
+	Priority    int      `json:"priority"`
 }
 
 // PromptTemplates holds all prompt templates for a domain + category combination.

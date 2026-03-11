@@ -1,6 +1,7 @@
 package gaming
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -8,9 +9,8 @@ import (
 )
 
 func init() {
-	// Tests run from domain-packs/gaming/go/ — set paths relative to that
-	promptsPath = "../prompts"
-	profilesPath = "../profiles"
+	// Tests run from domain-packs/gaming/go/ — set path relative to that
+	os.Setenv("DOMAIN_PACK_PATH", "..")
 }
 
 func TestGamingPackImplementsDiscoveryPack(t *testing.T) {

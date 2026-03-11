@@ -10,22 +10,34 @@ import (
 	"github.com/decisionbox-io/decisionbox/libs/go-common/domainpack"
 )
 
-// Default paths relative to the working directory.
-// Can be overridden via DOMAIN_PACK_PATH env var.
-var (
-	promptsPath  = "domain-packs/gaming/prompts"
-	profilesPath = "domain-packs/gaming/profiles"
-)
-
-func init() {
+// getPromptsPath returns the path to prompts, checking env var on each call.
+func getPromptsPath() string {
 	if p := os.Getenv("DOMAIN_PACK_PATH"); p != "" {
-		promptsPath = filepath.Join(p, "prompts")
-		profilesPath = filepath.Join(p, "profiles")
+		return filepath.Join(p, "prompts")
 	}
+	return "domain-packs/gaming/prompts"
+}
+
+// getProfilesPath returns the path to profiles, checking env var on each call.
+func getProfilesPath() string {
+	if p := os.Getenv("DOMAIN_PACK_PATH"); p != "" {
+		return filepath.Join(p, "profiles")
+	}
+	return "domain-packs/gaming/profiles"
 }
 
 // Compile-time check: GamingPack implements DiscoveryPack.
 var _ domainpack.DiscoveryPack = (*GamingPack)(nil)
+
+// areaFile represents an analysis area definition from areas.json.
+type areaFile struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Keywords    []string `json:"keywords"`
+	Priority    int      `json:"priority"`
+	PromptFile  string   `json:"prompt_file"`
+}
 
 // DomainCategories returns the game genre categories.
 func (p *GamingPack) DomainCategories() []domainpack.DomainCategory {
@@ -38,92 +50,59 @@ func (p *GamingPack) DomainCategories() []domainpack.DomainCategory {
 	}
 }
 
-// baseAnalysisAreas are shared across all gaming categories.
-var baseAnalysisAreas = []domainpack.AnalysisArea{
-	{
-		ID:          "churn",
-		Name:        "Churn Risks",
-		Description: "Players at risk of leaving the game",
-		Keywords:    []string{"churn", "retention", "cohort", "day_", "d1_", "d7_", "d30_", "inactive", "lapsed"},
-		IsBase:      true,
-		Priority:    1,
-	},
-	{
-		ID:          "engagement",
-		Name:        "Engagement Patterns",
-		Description: "Player behavior and session trends",
-		Keywords:    []string{"session", "engagement", "duration", "frequency", "active", "dau", "mau", "playtime"},
-		IsBase:      true,
-		Priority:    2,
-	},
-	{
-		ID:          "monetization",
-		Name:        "Monetization Opportunities",
-		Description: "Revenue optimization and conversion opportunities",
-		Keywords:    []string{"purchase", "iap", "revenue", "payer", "currency", "spend", "arpu", "ltv", "conversion"},
-		IsBase:      true,
-		Priority:    3,
-	},
-}
-
-// categoryAnalysisAreas maps category ID to category-specific analysis areas.
-var categoryAnalysisAreas = map[string][]domainpack.AnalysisArea{
-	"match3": {
-		{
-			ID:          "levels",
-			Name:        "Level Difficulty",
-			Description: "Difficulty spikes and frustration points in level progression",
-			Keywords:    []string{"level", "quit", "success", "difficulty", "fail", "attempt", "stage", "star"},
-			IsBase:      false,
-			Priority:    4,
-		},
-		{
-			ID:          "boosters",
-			Name:        "Booster Usage",
-			Description: "Power-up usage patterns, depletion risks, and purchase opportunities",
-			Keywords:    []string{"booster", "hint", "magnet", "power", "extra_life", "hammer", "consumable"},
-			IsBase:      false,
-			Priority:    5,
-		},
-	},
-}
-
 // AnalysisAreas returns base + category-specific analysis areas.
+// Reads from areas.json files — no hardcoded area definitions.
 func (p *GamingPack) AnalysisAreas(categoryID string) []domainpack.AnalysisArea {
-	areas := make([]domainpack.AnalysisArea, len(baseAnalysisAreas))
-	copy(areas, baseAnalysisAreas)
+	var areas []domainpack.AnalysisArea
 
-	if specific, ok := categoryAnalysisAreas[categoryID]; ok {
-		areas = append(areas, specific...)
+	// Load base areas
+	baseAreas := loadAreas(filepath.Join(getPromptsPath(), "base", "areas.json"))
+	for _, a := range baseAreas {
+		areas = append(areas, domainpack.AnalysisArea{
+			ID: a.ID, Name: a.Name, Description: a.Description,
+			Keywords: a.Keywords, IsBase: true, Priority: a.Priority,
+		})
+	}
+
+	// Load category-specific areas
+	if categoryID != "" {
+		catAreas := loadAreas(filepath.Join(getPromptsPath(), "categories", categoryID, "areas.json"))
+		for _, a := range catAreas {
+			areas = append(areas, domainpack.AnalysisArea{
+				ID: a.ID, Name: a.Name, Description: a.Description,
+				Keywords: a.Keywords, IsBase: false, Priority: a.Priority,
+			})
+		}
 	}
 
 	return areas
 }
 
 // Prompts returns merged prompt templates for a given category.
-// Reads from filesystem (not embedded) so prompts are language-agnostic.
+// Reads area definitions from areas.json and loads corresponding prompt files.
 func (p *GamingPack) Prompts(categoryID string) domainpack.PromptTemplates {
 	templates := domainpack.PromptTemplates{
 		AnalysisAreas: make(map[string]string),
 	}
 
 	// Load base exploration prompt
-	templates.Exploration = readPromptFile(filepath.Join(promptsPath, "base", "exploration.md"))
+	templates.Exploration = readPromptFile(filepath.Join(getPromptsPath(), "base", "exploration.md"))
 
 	// Merge category-specific exploration context
 	if categoryID != "" {
-		contextPath := filepath.Join(promptsPath, "categories", categoryID, "exploration_context.md")
+		contextPath := filepath.Join(getPromptsPath(), "categories", categoryID, "exploration_context.md")
 		if context := readPromptFile(contextPath); context != "" {
 			templates.Exploration = templates.Exploration + "\n\n" + context
 		}
 	}
 
-	// Load base recommendations prompt
-	templates.Recommendations = readPromptFile(filepath.Join(promptsPath, "base", "recommendations.md"))
+	// Load recommendations prompt
+	templates.Recommendations = readPromptFile(filepath.Join(getPromptsPath(), "base", "recommendations.md"))
 
-	// Load base analysis prompts
-	for _, area := range baseAnalysisAreas {
-		path := filepath.Join(promptsPath, "base", fmt.Sprintf("analysis_%s.md", area.ID))
+	// Load analysis prompts from areas.json definitions
+	baseAreas := loadAreas(filepath.Join(getPromptsPath(), "base", "areas.json"))
+	for _, area := range baseAreas {
+		path := filepath.Join(getPromptsPath(), "base", area.PromptFile)
 		if content := readPromptFile(path); content != "" {
 			templates.AnalysisAreas[area.ID] = content
 		}
@@ -131,12 +110,11 @@ func (p *GamingPack) Prompts(categoryID string) domainpack.PromptTemplates {
 
 	// Load category-specific analysis prompts
 	if categoryID != "" {
-		if specific, ok := categoryAnalysisAreas[categoryID]; ok {
-			for _, area := range specific {
-				path := filepath.Join(promptsPath, "categories", categoryID, fmt.Sprintf("analysis_%s.md", area.ID))
-				if content := readPromptFile(path); content != "" {
-					templates.AnalysisAreas[area.ID] = content
-				}
+		catAreas := loadAreas(filepath.Join(getPromptsPath(), "categories", categoryID, "areas.json"))
+		for _, area := range catAreas {
+			path := filepath.Join(getPromptsPath(), "categories", categoryID, area.PromptFile)
+			if content := readPromptFile(path); content != "" {
+				templates.AnalysisAreas[area.ID] = content
 			}
 		}
 	}
@@ -146,8 +124,7 @@ func (p *GamingPack) Prompts(categoryID string) domainpack.PromptTemplates {
 
 // ProfileSchema returns the merged JSON Schema for a given category.
 func (p *GamingPack) ProfileSchema(categoryID string) map[string]interface{} {
-	// Parse base schema
-	baseData, err := os.ReadFile(filepath.Join(profilesPath, "schema.json"))
+	baseData, err := os.ReadFile(filepath.Join(getProfilesPath(), "schema.json"))
 	if err != nil {
 		return map[string]interface{}{"error": "base schema not found: " + err.Error()}
 	}
@@ -161,8 +138,7 @@ func (p *GamingPack) ProfileSchema(categoryID string) map[string]interface{} {
 		return base
 	}
 
-	// Load category-specific schema and merge properties
-	catPath := filepath.Join(profilesPath, "categories", categoryID+".json")
+	catPath := filepath.Join(getProfilesPath(), "categories", categoryID+".json")
 	catData, err := os.ReadFile(catPath)
 	if err != nil {
 		return base
@@ -182,6 +158,22 @@ func (p *GamingPack) ProfileSchema(categoryID string) map[string]interface{} {
 	}
 
 	return base
+}
+
+// loadAreas reads analysis area definitions from an areas.json file.
+func loadAreas(path string) []areaFile {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	var areas []areaFile
+	if err := json.Unmarshal(data, &areas); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to parse %s: %v\n", path, err)
+		return nil
+	}
+
+	return areas
 }
 
 func readPromptFile(path string) string {

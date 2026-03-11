@@ -1,0 +1,18 @@
+[
+  {
+    "id": "levels",
+    "name": "Level Difficulty",
+    "description": "Difficulty spikes and frustration points in level progression",
+    "keywords": ["level", "quit", "success", "difficulty", "fail", "attempt", "stage", "star"],
+    "priority": 4,
+    "prompt_file": "analysis_levels.md"
+  },
+  {
+    "id": "boosters",
+    "name": "Booster Usage",
+    "description": "Power-up usage patterns, depletion risks, and purchase opportunities",
+    "keywords": ["booster", "hint", "magnet", "power", "extra_life", "hammer", "consumable"],
+    "priority": 5,
+    "prompt_file": "analysis_boosters.md"
+  }
+]

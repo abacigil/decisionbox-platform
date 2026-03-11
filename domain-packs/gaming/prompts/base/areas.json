@@ -1,0 +1,26 @@
+[
+  {
+    "id": "churn",
+    "name": "Churn Risks",
+    "description": "Players at risk of leaving the game",
+    "keywords": ["churn", "retention", "cohort", "day_", "d1_", "d7_", "d30_", "inactive", "lapsed"],
+    "priority": 1,
+    "prompt_file": "analysis_churn.md"
+  },
+  {
+    "id": "engagement",
+    "name": "Engagement Patterns",
+    "description": "Player behavior and session trends",
+    "keywords": ["session", "engagement", "duration", "frequency", "active", "dau", "mau", "playtime"],
+    "priority": 2,
+    "prompt_file": "analysis_engagement.md"
+  },
+  {
+    "id": "monetization",
+    "name": "Monetization Opportunities",
+    "description": "Revenue optimization and conversion opportunities",
+    "keywords": ["purchase", "iap", "revenue", "payer", "currency", "spend", "arpu", "ltv", "conversion"],
+    "priority": 3,
+    "prompt_file": "analysis_monetization.md"
+  }
+]
