@@ -261,10 +261,10 @@ export const api = {
     request<ProjectPrompts>(`/api/v1/projects/${projectId}/prompts`, { method: 'PUT', body: JSON.stringify(prompts) }),
 
   // Discovery
-  triggerDiscovery: (projectId: string, areas?: string[]) =>
+  triggerDiscovery: (projectId: string, options?: { areas?: string[]; max_steps?: number }) =>
     request<{ status: string; message: string; run_id?: string }>(`/api/v1/projects/${projectId}/discover`, {
       method: 'POST',
-      body: areas && areas.length > 0 ? JSON.stringify({ areas }) : undefined,
+      body: options ? JSON.stringify(options) : undefined,
     }),
   getRun: (runId: string) =>
     request<DiscoveryRunStatus>(`/api/v1/runs/${runId}`),

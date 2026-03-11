@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
-  Badge, Button, Card, Checkbox, Code, Grid, Group, Loader, Menu, Progress, ScrollArea, Stack, Tabs, Text, Timeline, Title,
+  Badge, Button, Card, Checkbox, Code, Grid, Group, Loader, Menu, NumberInput, Progress, ScrollArea, Stack, Tabs, Text, Timeline, Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -27,6 +27,7 @@ export default function ProjectPage() {
   const [triggering, setTriggering] = useState(false);
   const [analysisAreas, setAnalysisAreas] = useState<{ id: string; name: string }[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [maxSteps, setMaxSteps] = useState(100);
 
   // Load project, latest discovery, and analysis areas
   useEffect(() => {
@@ -64,14 +65,18 @@ export default function ProjectPage() {
   const handleTrigger = async (areas?: string[]) => {
     setTriggering(true);
     try {
-      const result = await api.triggerDiscovery(id, areas);
+      const opts: { areas?: string[]; max_steps?: number } = {};
+      if (areas && areas.length > 0) opts.areas = areas;
+      if (maxSteps !== 100) opts.max_steps = maxSteps;
+
+      const result = await api.triggerDiscovery(id, Object.keys(opts).length > 0 ? opts : undefined);
       if (result.run_id) {
         const newRun = await api.getRun(result.run_id);
         setRun(newRun);
       }
       const msg = areas && areas.length > 0
-        ? `Running: ${areas.join(', ')}`
-        : 'Full discovery started';
+        ? `Running ${areas.join(', ')} (${maxSteps} steps)`
+        : `Full discovery started (${maxSteps} steps)`;
       notifications.show({ title: 'Discovery started', message: msg, color: 'blue' });
     } catch (e: unknown) {
       notifications.show({ title: 'Error', message: (e as Error).message, color: 'red' });
@@ -122,6 +127,13 @@ export default function ProjectPage() {
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
+                <Menu.Label>Exploration steps</Menu.Label>
+                <div style={{ padding: '4px 12px 8px' }}>
+                  <NumberInput size="xs" value={maxSteps} onChange={(v) => setMaxSteps(Number(v) || 100)}
+                    min={5} max={500} step={5}
+                    description="More steps = more comprehensive discovery" />
+                </div>
+                <Menu.Divider />
                 <Menu.Item onClick={() => handleTrigger()}>
                   Run All Areas
                 </Menu.Item>

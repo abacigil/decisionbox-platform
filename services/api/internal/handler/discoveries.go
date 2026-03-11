@@ -118,9 +118,10 @@ func (h *DiscoveriesHandler) TriggerDiscovery(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Parse optional areas filter from request body
+	// Parse optional request body
 	var body struct {
-		Areas []string `json:"areas"` // optional: run only these areas
+		Areas    []string `json:"areas"`     // optional: run only these areas
+		MaxSteps int      `json:"max_steps"` // optional: override exploration steps (default 100)
 	}
 	decodeJSON(r, &body) // ignore error — body is optional
 
@@ -138,6 +139,9 @@ func (h *DiscoveriesHandler) TriggerDiscovery(w http.ResponseWriter, r *http.Req
 	}
 	if len(body.Areas) > 0 {
 		args = append(args, "--areas", strings.Join(body.Areas, ","))
+	}
+	if body.MaxSteps > 0 {
+		args = append(args, "--max-steps", strconv.Itoa(body.MaxSteps))
 	}
 	cmd := exec.Command("decisionbox-agent", args...)
 
