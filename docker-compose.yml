@@ -197,11 +197,13 @@ services:
       # DASHBOARD — Frontend configuration
       # ============================================================
 
-      # API URL (from the browser's perspective for client-side fetches)
+      # Backend API URL (server-side only — NOT exposed to browser)
+      # Next.js rewrites proxy /api/* requests to this URL server-side.
       # Values: full URL including protocol and port
-      # For local: http://localhost:8080
-      # For production: https://api.yourdomain.com
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      # For docker-compose: http://api:8080 (service name)
+      # For K8s: http://decisionbox-api:8080 (cluster-internal service)
+      # For local dev: http://localhost:8080 (default)
+      - API_URL=http://api:8080
 
       # Dashboard listen port
       # Values: any available port number

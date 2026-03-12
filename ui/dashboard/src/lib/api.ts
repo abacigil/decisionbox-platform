@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+// All API calls use relative paths (/api/v1/...) — Next.js rewrites
+// proxy them to the backend API server-side. No direct browser-to-API calls.
+const API_BASE = '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
