@@ -91,7 +91,13 @@ export default function NewProjectPage() {
           filter_field: filterField,
           filter_value: filterValue,
         },
-        llm: { provider: llmProvider, model: llmConfig['model'] || '' },
+        llm: {
+          provider: llmProvider,
+          model: llmConfig['model'] || '',
+          config: Object.fromEntries(
+            Object.entries(llmConfig).filter(([k]) => k !== 'model' && k !== 'api_key')
+          ),
+        },
         schedule: { enabled: scheduleEnabled, cron_expr: scheduleCron, max_steps: maxSteps },
       });
       notifications.show({ title: 'Project created', message: project.name, color: 'green' });

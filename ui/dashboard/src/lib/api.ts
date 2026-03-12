@@ -226,7 +226,6 @@ export interface ProviderMeta {
   name: string;
   description: string;
   config_fields: ConfigField[];
-  default_pricing?: Record<string, { input_per_million: number; output_per_million: number }>;
 }
 
 export interface ConfigField {

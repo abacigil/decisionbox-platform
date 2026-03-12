@@ -145,11 +145,13 @@ export default function ProjectSettingsPage() {
               value={whProvider} onChange={(v) => setWhProvider(v || '')} />
             {selectedWh?.description && <Text size="xs" c="dimmed">{selectedWh.description}</Text>}
 
-            {selectedWh?.config_fields.map((field) => (
-              <DynamicField key={field.key} field={field}
-                value={whConfig[field.key] || ''}
-                onChange={(val) => setWhConfig((prev) => ({ ...prev, [field.key]: val }))} />
-            ))}
+            {selectedWh?.config_fields
+              .filter((f) => f.key !== 'dataset')
+              .map((field) => (
+                <DynamicField key={field.key} field={field}
+                  value={whConfig[field.key] || ''}
+                  onChange={(val) => setWhConfig((prev) => ({ ...prev, [field.key]: val }))} />
+              ))}
 
             <TextInput label="Datasets" description="Comma-separated dataset names"
               placeholder="events_prod, features_prod"
@@ -176,18 +178,8 @@ export default function ProjectSettingsPage() {
               }} />
             {selectedLlm?.description && <Text size="xs" c="dimmed">{selectedLlm.description}</Text>}
 
-            {/* Model dropdown from provider's pricing data */}
-            {selectedLlm?.default_pricing && Object.keys(selectedLlm.default_pricing).filter(m => m !== '_default').length > 0 ? (
-              <Select label="Model" data={
-                Object.keys(selectedLlm.default_pricing)
-                  .filter((m) => m !== '_default')
-                  .map((m) => ({ value: m, label: m }))
-              } value={llmModel} onChange={(v) => setLlmModel(v || '')}
-                searchable allowDeselect={false} />
-            ) : (
-              <TextInput label="Model" value={llmModel} onChange={(e) => setLlmModel(e.target.value)}
-                placeholder="Enter model name" />
-            )}
+            <TextInput label="Model" value={llmModel} onChange={(e) => setLlmModel(e.target.value)}
+              placeholder="e.g. claude-opus-4-6, gpt-4o, gemini-2.5-pro" />
 
             {/* Provider-specific config fields (e.g., project_id, location for Vertex AI) */}
             {selectedLlm?.config_fields
