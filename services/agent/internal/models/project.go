@@ -83,8 +83,9 @@ func (w *WarehouseConfig) GetDatasets() []string {
 }
 
 type LLMConfig struct {
-	Provider string `bson:"provider" json:"provider"`
-	Model    string `bson:"model" json:"model"`
+	Provider string            `bson:"provider" json:"provider"`
+	Model    string            `bson:"model" json:"model"`
+	Config   map[string]string `bson:"config,omitempty" json:"config,omitempty"` // provider-specific: project_id, location, host, etc.
 }
 
 type ScheduleConfig struct {

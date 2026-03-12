@@ -83,6 +83,7 @@ export interface WarehouseConfig {
 export interface LLMConfig {
   provider: string;
   model: string;
+  config?: Record<string, string>; // provider-specific: project_id, location, host, etc.
 }
 
 export interface ScheduleConfig {
@@ -225,6 +226,7 @@ export interface ProviderMeta {
   name: string;
   description: string;
   config_fields: ConfigField[];
+  default_pricing?: Record<string, { input_per_million: number; output_per_million: number }>;
 }
 
 export interface ConfigField {

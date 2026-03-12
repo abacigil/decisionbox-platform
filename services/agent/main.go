@@ -152,14 +152,19 @@ func runDiscovery(cfg *config.Config, projectID string, runID string, selectedAr
 		"datasets": datasets,
 	}).Info("Warehouse provider initialized")
 
-	// LLM config comes from project, API key from env var (secret)
-	llm, err := gollm.NewProvider(project.LLM.Provider, gollm.ProviderConfig{
+	// LLM config comes from project + env vars
+	llmCfg := gollm.ProviderConfig{
 		"api_key":          cfg.LLM.APIKey,
 		"model":            project.LLM.Model,
 		"max_retries":      strconv.Itoa(cfg.LLM.MaxRetries),
 		"timeout_seconds":  strconv.Itoa(int(cfg.LLM.Timeout.Seconds())),
 		"request_delay_ms": strconv.Itoa(cfg.LLM.RequestDelayMs),
-	})
+	}
+	// Merge provider-specific config from project (e.g., project_id, location for Vertex AI)
+	for k, v := range project.LLM.Config {
+		llmCfg[k] = v
+	}
+	llm, err := gollm.NewProvider(project.LLM.Provider, llmCfg)
 	if err != nil {
 		return fmt.Errorf("failed to create LLM provider (%s): %w", project.LLM.Provider, err)
 	}

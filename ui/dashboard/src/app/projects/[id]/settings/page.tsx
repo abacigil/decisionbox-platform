@@ -31,6 +31,7 @@ export default function ProjectSettingsPage() {
   const [filterValue, setFilterValue] = useState('');
   const [llmProvider, setLlmProvider] = useState('');
   const [llmModel, setLlmModel] = useState('');
+  const [llmConfig, setLlmConfig] = useState<Record<string, string>>({});
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleCron, setScheduleCron] = useState('');
   const [maxSteps, setMaxSteps] = useState(100);
@@ -61,6 +62,7 @@ export default function ProjectSettingsPage() {
         setFilterValue(proj.warehouse.filter_value || '');
         setLlmProvider(proj.llm.provider);
         setLlmModel(proj.llm.model);
+        setLlmConfig(proj.llm.config || {});
         setScheduleEnabled(proj.schedule?.enabled || false);
         setScheduleCron(proj.schedule?.cron_expr || '0 2 * * *');
         setMaxSteps(proj.schedule?.max_steps || 100);
@@ -93,7 +95,7 @@ export default function ProjectSettingsPage() {
           filter_field: filterField,
           filter_value: filterValue,
         },
-        llm: { provider: llmProvider, model: llmModel },
+        llm: { provider: llmProvider, model: llmModel, config: llmConfig },
         schedule: { enabled: scheduleEnabled, cron_expr: scheduleCron, max_steps: maxSteps },
         profile,
       });
@@ -167,10 +169,34 @@ export default function ProjectSettingsPage() {
           <Title order={4} mb="md">AI Provider</Title>
           <Stack>
             <Select label="LLM Provider" data={llmProviders.map((p) => ({ value: p.id, label: p.name }))}
-              value={llmProvider} onChange={(v) => setLlmProvider(v || '')} />
+              value={llmProvider} onChange={(v) => {
+                setLlmProvider(v || '');
+                setLlmModel('');
+                setLlmConfig({});
+              }} />
             {selectedLlm?.description && <Text size="xs" c="dimmed">{selectedLlm.description}</Text>}
 
-            <TextInput label="Model" value={llmModel} onChange={(e) => setLlmModel(e.target.value)} />
+            {/* Model dropdown from provider's pricing data */}
+            {selectedLlm?.default_pricing && Object.keys(selectedLlm.default_pricing).filter(m => m !== '_default').length > 0 ? (
+              <Select label="Model" data={
+                Object.keys(selectedLlm.default_pricing)
+                  .filter((m) => m !== '_default')
+                  .map((m) => ({ value: m, label: m }))
+              } value={llmModel} onChange={(v) => setLlmModel(v || '')}
+                searchable allowDeselect={false} />
+            ) : (
+              <TextInput label="Model" value={llmModel} onChange={(e) => setLlmModel(e.target.value)}
+                placeholder="Enter model name" />
+            )}
+
+            {/* Provider-specific config fields (e.g., project_id, location for Vertex AI) */}
+            {selectedLlm?.config_fields
+              .filter((f) => f.key !== 'model' && f.key !== 'api_key')
+              .map((field) => (
+                <DynamicField key={field.key} field={field}
+                  value={llmConfig[field.key] || ''}
+                  onChange={(val) => setLlmConfig((prev) => ({ ...prev, [field.key]: val }))} />
+              ))}
           </Stack>
         </Card>
 
