@@ -80,7 +80,7 @@ func init() {
 
 // RedshiftProvider implements warehouse.Provider using the Redshift Data API.
 type RedshiftProvider struct {
-	client    *redshiftdata.Client
+	client    dataAPIClient
 	workgroup string // Serverless
 	clusterID string // Provisioned
 	database  string
@@ -158,18 +158,18 @@ func (p *RedshiftProvider) waitForCompletion(ctx context.Context, stmtID string)
 	}
 }
 
-// getResults fetches query results with pagination.
+// getResults fetches query results, handling pagination via NextToken.
 func (p *RedshiftProvider) getResults(ctx context.Context, stmtID string) (*gowarehouse.QueryResult, error) {
 	var columns []string
 	var rows []map[string]interface{}
 
-	paginator := redshiftdata.NewGetStatementResultPaginator(p.client, &redshiftdata.GetStatementResultInput{
+	input := &redshiftdata.GetStatementResultInput{
 		Id: aws.String(stmtID),
-	})
+	}
 
 	firstPage := true
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
+	for {
+		page, err := p.client.GetStatementResult(ctx, input)
 		if err != nil {
 			return nil, fmt.Errorf("redshift: GetStatementResult failed: %w", err)
 		}
@@ -193,6 +193,11 @@ func (p *RedshiftProvider) getResults(ctx context.Context, stmtID string) (*gowa
 			}
 			rows = append(rows, row)
 		}
+
+		if page.NextToken == nil {
+			break
+		}
+		input.NextToken = page.NextToken
 	}
 
 	return &gowarehouse.QueryResult{
@@ -244,9 +249,8 @@ func (p *RedshiftProvider) ListTablesInDataset(ctx context.Context, dataset stri
 	}
 
 	var tables []string
-	paginator := redshiftdata.NewListTablesPaginator(p.client, input)
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
+	for {
+		page, err := p.client.ListTables(ctx, input)
 		if err != nil {
 			return nil, fmt.Errorf("redshift: ListTables failed: %w", err)
 		}
@@ -257,6 +261,10 @@ func (p *RedshiftProvider) ListTablesInDataset(ctx context.Context, dataset stri
 				tables = append(tables, name)
 			}
 		}
+		if page.NextToken == nil {
+			break
+		}
+		input.NextToken = page.NextToken
 	}
 
 	return tables, nil

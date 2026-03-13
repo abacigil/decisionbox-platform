@@ -1,8 +1,13 @@
 package redshift
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/redshiftdata/types"
 	gowarehouse "github.com/decisionbox-io/decisionbox/libs/go-common/warehouse"
 )
 
@@ -103,9 +108,222 @@ func TestRedshiftProvider_SQLDialect(t *testing.T) {
 }
 
 func TestExtractFieldValue_Nil(t *testing.T) {
-	// nil field should not panic
 	result := extractFieldValue(nil)
 	if result != nil {
 		t.Errorf("expected nil, got %v", result)
+	}
+}
+
+func TestExtractFieldValue_Types(t *testing.T) {
+	tests := []struct {
+		name  string
+		field types.Field
+		want  interface{}
+	}{
+		{"string", &types.FieldMemberStringValue{Value: "hello"}, "hello"},
+		{"long", &types.FieldMemberLongValue{Value: 42}, int64(42)},
+		{"double", &types.FieldMemberDoubleValue{Value: 3.14}, 3.14},
+		{"bool", &types.FieldMemberBooleanValue{Value: true}, true},
+		{"null", &types.FieldMemberIsNull{Value: true}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractFieldValue(tt.field)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// --- Mock client tests ---
+
+func newMockProvider() *RedshiftProvider {
+	return &RedshiftProvider{
+		client:    &mockDataAPIClient{},
+		workgroup: "test-workgroup",
+		database:  "testdb",
+		dataset:   "public",
+		timeout:   10 * time.Second,
+	}
+}
+
+func TestMock_Query_Success(t *testing.T) {
+	mock := &mockDataAPIClient{
+		resultColumns: []types.ColumnMetadata{
+			{Name: aws.String("id")},
+			{Name: aws.String("name")},
+		},
+		resultRecords: [][]types.Field{
+			{&types.FieldMemberLongValue{Value: 1}, &types.FieldMemberStringValue{Value: "alice"}},
+			{&types.FieldMemberLongValue{Value: 2}, &types.FieldMemberStringValue{Value: "bob"}},
+		},
+	}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", timeout: 10 * time.Second}
+
+	result, err := p.Query(context.Background(), "SELECT id, name FROM users", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Columns) != 2 {
+		t.Errorf("columns = %d, want 2", len(result.Columns))
+	}
+	if len(result.Rows) != 2 {
+		t.Errorf("rows = %d, want 2", len(result.Rows))
+	}
+	if result.Rows[0]["name"] != "alice" {
+		t.Errorf("row[0].name = %v", result.Rows[0]["name"])
+	}
+	if result.Rows[1]["id"] != int64(2) {
+		t.Errorf("row[1].id = %v", result.Rows[1]["id"])
+	}
+	if mock.executedSQL != "SELECT id, name FROM users" {
+		t.Errorf("SQL = %q", mock.executedSQL)
+	}
+}
+
+func TestMock_Query_ExecuteError(t *testing.T) {
+	mock := &mockDataAPIClient{executeErr: fmt.Errorf("access denied")}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", timeout: 10 * time.Second}
+
+	_, err := p.Query(context.Background(), "SELECT 1", nil)
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestMock_Query_Failed(t *testing.T) {
+	mock := &mockDataAPIClient{describeStatus: types.StatusStringFailed}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", timeout: 10 * time.Second}
+
+	_, err := p.Query(context.Background(), "SELECT 1", nil)
+	if err == nil {
+		t.Error("expected error for failed query")
+	}
+}
+
+func TestMock_Query_Aborted(t *testing.T) {
+	mock := &mockDataAPIClient{describeStatus: types.StatusStringAborted}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", timeout: 10 * time.Second}
+
+	_, err := p.Query(context.Background(), "SELECT 1", nil)
+	if err == nil {
+		t.Error("expected error for aborted query")
+	}
+}
+
+func TestMock_Query_ResultError(t *testing.T) {
+	mock := &mockDataAPIClient{resultErr: fmt.Errorf("result fetch failed")}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", timeout: 10 * time.Second}
+
+	_, err := p.Query(context.Background(), "SELECT 1", nil)
+	if err == nil {
+		t.Error("expected error for result fetch failure")
+	}
+}
+
+func TestMock_ListTables(t *testing.T) {
+	mock := &mockDataAPIClient{
+		tables: []types.TableMember{
+			{Name: aws.String("users")},
+			{Name: aws.String("orders")},
+			{Name: aws.String("pg_catalog")},  // system — should be filtered
+			{Name: aws.String("stl_query")},   // system — should be filtered
+			{Name: aws.String("svv_tables")},  // system — should be filtered
+		},
+	}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", dataset: "public", timeout: 10 * time.Second}
+
+	tables, err := p.ListTables(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tables) != 2 {
+		t.Errorf("tables = %v, want [users, orders]", tables)
+	}
+}
+
+func TestMock_ListTables_Error(t *testing.T) {
+	mock := &mockDataAPIClient{tablesErr: fmt.Errorf("access denied")}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", dataset: "public", timeout: 10 * time.Second}
+
+	_, err := p.ListTables(context.Background())
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestMock_DescribeTable(t *testing.T) {
+	mock := &mockDataAPIClient{
+		describeCols: []types.ColumnMetadata{
+			{Name: aws.String("id"), TypeName: aws.String("integer"), Nullable: 0},
+			{Name: aws.String("name"), TypeName: aws.String("varchar"), Nullable: 1},
+			{Name: aws.String("created_at"), TypeName: aws.String("timestamp"), Nullable: 1},
+		},
+		// Also mock the count query
+		resultColumns: []types.ColumnMetadata{{Name: aws.String("cnt")}},
+		resultRecords: [][]types.Field{{&types.FieldMemberLongValue{Value: 1000}}},
+	}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", dataset: "public", timeout: 10 * time.Second}
+
+	schema, err := p.GetTableSchema(context.Background(), "users")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schema.Name != "users" {
+		t.Errorf("name = %q", schema.Name)
+	}
+	if len(schema.Columns) != 3 {
+		t.Fatalf("columns = %d, want 3", len(schema.Columns))
+	}
+	if schema.Columns[0].Type != "INT64" {
+		t.Errorf("col[0].type = %q, want INT64", schema.Columns[0].Type)
+	}
+	if schema.Columns[1].Type != "STRING" {
+		t.Errorf("col[1].type = %q, want STRING", schema.Columns[1].Type)
+	}
+	if schema.Columns[2].Type != "TIMESTAMP" {
+		t.Errorf("col[2].type = %q, want TIMESTAMP", schema.Columns[2].Type)
+	}
+	if !schema.Columns[1].Nullable {
+		t.Error("col[1] should be nullable")
+	}
+	if schema.RowCount != 1000 {
+		t.Errorf("row_count = %d, want 1000", schema.RowCount)
+	}
+}
+
+func TestMock_Query_Provisioned(t *testing.T) {
+	mock := &mockDataAPIClient{
+		resultColumns: []types.ColumnMetadata{{Name: aws.String("val")}},
+		resultRecords: [][]types.Field{{&types.FieldMemberLongValue{Value: 1}}},
+	}
+	p := &RedshiftProvider{client: mock, clusterID: "my-cluster", dbUser: "admin", database: "db", timeout: 10 * time.Second}
+
+	result, err := p.Query(context.Background(), "SELECT 1 as val", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Rows) != 1 {
+		t.Errorf("rows = %d", len(result.Rows))
+	}
+}
+
+func TestMock_EmptyResult(t *testing.T) {
+	mock := &mockDataAPIClient{
+		resultColumns: []types.ColumnMetadata{{Name: aws.String("id")}},
+		resultRecords: [][]types.Field{},
+	}
+	p := &RedshiftProvider{client: mock, workgroup: "wg", database: "db", timeout: 10 * time.Second}
+
+	result, err := p.Query(context.Background(), "SELECT id FROM empty_table", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Rows) != 0 {
+		t.Errorf("rows = %d, want 0", len(result.Rows))
+	}
+	if len(result.Columns) != 1 {
+		t.Errorf("columns = %d, want 1", len(result.Columns))
 	}
 }
