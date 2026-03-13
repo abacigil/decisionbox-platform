@@ -62,6 +62,39 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
 
       # ============================================================
+      # SECRETS — Per-project secret management
+      # ============================================================
+
+      # Secret provider
+      # Values: mongodb | gcp | aws | azure
+      # mongodb: AES-256 encrypted MongoDB collection (default, local dev)
+      # gcp: Google Cloud Secret Manager (production GCP)
+      # aws: AWS Secrets Manager (production AWS) — not yet implemented
+      # azure: Azure Key Vault (production Azure) — not yet implemented
+      - SECRET_PROVIDER=mongodb
+
+      # Namespace prefix for all secrets (prevents conflicts in shared cloud accounts)
+      # Values: any string (e.g., decisionbox, decisionbox-prod, decisionbox-staging)
+      - SECRET_NAMESPACE=decisionbox
+
+      # Encryption key for MongoDB secret provider (base64-encoded 32-byte key)
+      # Values: base64 string (generate with: openssl rand -base64 32)
+      # Required for encrypted storage. If empty, secrets stored in plaintext with warning.
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY:-}
+
+      # GCP Secret Manager (only when SECRET_PROVIDER=gcp)
+      # Values: GCP project ID
+      # - SECRET_GCP_PROJECT_ID=my-gcp-project
+
+      # AWS Secrets Manager (only when SECRET_PROVIDER=aws)
+      # Values: AWS region
+      # - SECRET_AWS_REGION=us-east-1
+
+      # Azure Key Vault (only when SECRET_PROVIDER=azure)
+      # Values: full vault URL
+      # - SECRET_AZURE_VAULT_URL=https://myvault.vault.azure.net
+
+      # ============================================================
       # DOMAIN PACKS — Prompt & schema files
       # ============================================================
 
@@ -156,6 +189,20 @@ services:
       # Delay between consecutive LLM calls (rate limiting / cost control)
       # Values: milliseconds (0 = no delay)
       - LLM_REQUEST_DELAY_MS=1000
+
+      # ============================================================
+      # SECRETS — Per-project secret management (must match API config)
+      # ============================================================
+
+      # Same secret provider config as API — agent reads secrets from same store
+      # Values: mongodb | gcp | aws | azure
+      - SECRET_PROVIDER=mongodb
+      - SECRET_NAMESPACE=decisionbox
+      # Values: base64 string (generate with: openssl rand -base64 32)
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY:-}
+      # - SECRET_GCP_PROJECT_ID=my-gcp-project
+      # - SECRET_AWS_REGION=us-east-1
+      # - SECRET_AZURE_VAULT_URL=https://myvault.vault.azure.net
 
       # ============================================================
       # DOMAIN PACKS — Prompt & schema files
