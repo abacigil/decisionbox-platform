@@ -183,12 +183,12 @@ func (p *RedshiftProvider) getResults(ctx context.Context, stmtID string) (*gowa
 			firstPage = false
 		}
 
-		// Convert rows
+		// Convert rows (pass column metadata for type-aware parsing)
 		for _, record := range page.Records {
 			row := make(map[string]interface{})
 			for i, field := range record {
 				if i < len(columns) {
-					row[columns[i]] = extractFieldValue(field)
+					row[columns[i]] = extractFieldValue(field, page.ColumnMetadata[i])
 				}
 			}
 			rows = append(rows, row)
@@ -207,9 +207,19 @@ func (p *RedshiftProvider) getResults(ctx context.Context, stmtID string) (*gowa
 }
 
 // extractFieldValue converts a Redshift Data API Field to a Go value.
-func extractFieldValue(field types.Field) interface{} {
+// Uses column metadata for type-aware parsing — DECIMAL/NUMERIC strings
+// are converted to float64 for analytics use.
+func extractFieldValue(field types.Field, colMeta types.ColumnMetadata) interface{} {
 	switch v := field.(type) {
 	case *types.FieldMemberStringValue:
+		// DECIMAL/NUMERIC come as StringValue — convert to float64
+		typeName := strings.ToLower(aws.ToString(colMeta.TypeName))
+		if strings.HasPrefix(typeName, "numeric") || strings.HasPrefix(typeName, "decimal") ||
+			typeName == "real" || typeName == "float4" {
+			if f, err := strconv.ParseFloat(v.Value, 64); err == nil {
+				return f
+			}
+		}
 		return v.Value
 	case *types.FieldMemberLongValue:
 		return v.Value

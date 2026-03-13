@@ -108,31 +108,57 @@ func TestRedshiftProvider_SQLDialect(t *testing.T) {
 }
 
 func TestExtractFieldValue_Nil(t *testing.T) {
-	result := extractFieldValue(nil)
+	result := extractFieldValue(nil, types.ColumnMetadata{})
 	if result != nil {
 		t.Errorf("expected nil, got %v", result)
 	}
 }
 
 func TestExtractFieldValue_Types(t *testing.T) {
+	strCol := types.ColumnMetadata{TypeName: aws.String("varchar")}
 	tests := []struct {
 		name  string
 		field types.Field
+		col   types.ColumnMetadata
 		want  interface{}
 	}{
-		{"string", &types.FieldMemberStringValue{Value: "hello"}, "hello"},
-		{"long", &types.FieldMemberLongValue{Value: 42}, int64(42)},
-		{"double", &types.FieldMemberDoubleValue{Value: 3.14}, 3.14},
-		{"bool", &types.FieldMemberBooleanValue{Value: true}, true},
-		{"null", &types.FieldMemberIsNull{Value: true}, nil},
+		{"string", &types.FieldMemberStringValue{Value: "hello"}, strCol, "hello"},
+		{"long", &types.FieldMemberLongValue{Value: 42}, strCol, int64(42)},
+		{"double", &types.FieldMemberDoubleValue{Value: 3.14}, strCol, 3.14},
+		{"bool", &types.FieldMemberBooleanValue{Value: true}, strCol, true},
+		{"null", &types.FieldMemberIsNull{Value: true}, strCol, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractFieldValue(tt.field)
+			got := extractFieldValue(tt.field, tt.col)
 			if got != tt.want {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestExtractFieldValue_DecimalToFloat(t *testing.T) {
+	decCol := types.ColumnMetadata{TypeName: aws.String("numeric(10,2)")}
+	got := extractFieldValue(&types.FieldMemberStringValue{Value: "150.75"}, decCol)
+	if got != 150.75 {
+		t.Errorf("decimal got %v (%T), want 150.75 (float64)", got, got)
+	}
+}
+
+func TestExtractFieldValue_DecimalZero(t *testing.T) {
+	decCol := types.ColumnMetadata{TypeName: aws.String("decimal(10,2)")}
+	got := extractFieldValue(&types.FieldMemberStringValue{Value: "0.00"}, decCol)
+	if got != 0.0 {
+		t.Errorf("decimal zero got %v (%T), want 0.0", got, got)
+	}
+}
+
+func TestExtractFieldValue_StringNotConverted(t *testing.T) {
+	strCol := types.ColumnMetadata{TypeName: aws.String("varchar")}
+	got := extractFieldValue(&types.FieldMemberStringValue{Value: "150.75"}, strCol)
+	if got != "150.75" {
+		t.Errorf("varchar should stay string, got %v (%T)", got, got)
 	}
 }
 
