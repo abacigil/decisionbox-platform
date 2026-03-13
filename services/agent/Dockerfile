@@ -10,8 +10,10 @@ COPY providers/llm/claude/go.mod providers/llm/claude/
 COPY providers/llm/openai/go.mod providers/llm/openai/
 COPY providers/llm/ollama/go.mod providers/llm/ollama/go.sum providers/llm/ollama/
 COPY providers/llm/vertex-ai/go.mod providers/llm/vertex-ai/go.sum providers/llm/vertex-ai/
-COPY providers/llm/bedrock/go.mod providers/llm/bedrock/
+COPY providers/llm/bedrock/go.mod providers/llm/bedrock/go.sum providers/llm/bedrock/
 COPY providers/warehouse/bigquery/go.mod providers/warehouse/bigquery/go.sum providers/warehouse/bigquery/
+COPY providers/warehouse/redshift/go.mod providers/warehouse/redshift/go.sum providers/warehouse/redshift/
+COPY providers/secrets/mongodb/go.mod providers/secrets/mongodb/go.sum providers/secrets/mongodb/
 COPY domain-packs/gaming/go/go.mod domain-packs/gaming/go/
 COPY services/agent/go.mod services/agent/go.sum services/agent/
 
