@@ -85,7 +85,7 @@ test-ui: ## Run dashboard tests
 # --- Development ---
 
 dev-api: ## Run API locally (requires MongoDB on localhost:27017)
-	cd services/api && MONGODB_URI=mongodb://localhost:27017 MONGODB_DB=decisionbox go run .
+	cd services/api && MONGODB_URI=mongodb://localhost:27017 MONGODB_DB=decisionbox DOMAIN_PACK_PATH=../../domain-packs go run .
 
 dev-dashboard: ## Run Dashboard locally
 	cd ui/dashboard && npm run dev

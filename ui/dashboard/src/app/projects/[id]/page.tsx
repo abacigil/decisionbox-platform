@@ -37,7 +37,7 @@ export default function ProjectPage() {
       api.getProject(id).then((p) => {
         setProject(p);
         return api.getAnalysisAreas(p.domain, p.category)
-          .then((areas) => setAnalysisAreas(areas.map((a) => ({ id: a.id, name: a.name }))));
+          .then((areas) => setAnalysisAreas((areas || []).map((a) => ({ id: a.id, name: a.name }))));
       }),
       api.listDiscoveries(id).then((d) => setDiscoveries(d || [])).catch(() => setDiscoveries([])),
     ])
