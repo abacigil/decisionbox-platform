@@ -159,6 +159,7 @@ export interface Summary {
   total_insights: number;
   total_recommendations: number;
   queries_executed: number;
+  errors?: string[];
 }
 
 export interface ExplorationStep {

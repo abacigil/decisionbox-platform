@@ -18,9 +18,10 @@ package bedrock
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
-	"net/http"
 
 	gollm "github.com/decisionbox-io/decisionbox/libs/go-common/llm"
 
@@ -39,6 +40,11 @@ func init() {
 			return nil, fmt.Errorf("bedrock: model is required")
 		}
 
+		timeoutSec, _ := strconv.Atoi(cfg["timeout_seconds"])
+		if timeoutSec == 0 {
+			timeoutSec = 300
+		}
+
 		awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 			awsconfig.WithRegion(region),
 		)
@@ -52,7 +58,7 @@ func init() {
 			client:     client,
 			region:     region,
 			model:      model,
-			httpClient: &http.Client{Timeout: 120 * time.Second},
+			httpClient: &http.Client{Timeout: time.Duration(timeoutSec) * time.Second},
 		}, nil
 	}, gollm.ProviderMeta{
 		Name:        "AWS Bedrock",

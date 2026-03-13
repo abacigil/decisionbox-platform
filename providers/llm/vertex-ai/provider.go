@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,7 +41,10 @@ func init() {
 			return nil, fmt.Errorf("vertex-ai: model is required")
 		}
 
-		timeoutSec := 120
+		timeoutSec, _ := strconv.Atoi(cfg["timeout_seconds"])
+		if timeoutSec == 0 {
+			timeoutSec = 300 // 5 minutes default — Opus needs more time for large prompts
+		}
 		ctx := context.Background()
 
 		// Initialize GCP auth

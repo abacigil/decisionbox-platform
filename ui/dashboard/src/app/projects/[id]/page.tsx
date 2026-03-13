@@ -392,7 +392,7 @@ function DiscoveryRunCard({ discovery: d, projectId }: { discovery: DiscoveryRes
               })}
             </div>
             <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-              <StatusBadge status={d.run_type === 'partial' ? 'Partial' : 'Complete'} />
+              <StatusBadge status={d.run_type === 'failed' ? 'Failed' : d.run_type === 'partial' ? 'Partial' : 'Complete'} />
               {d.areas_requested?.map(a => <AreaBadge key={a} area={a} />)}
               <span style={{ fontSize: 11, color: 'var(--db-text-tertiary)' }}>
                 {d.total_steps} queries · {d.duration || '—'}

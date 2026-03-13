@@ -410,6 +410,22 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 		}).Info("Analysis complete for area")
 	}
 
+	// Check for analysis failures
+	var analysisErrors []string
+	failedAreas := 0
+	for _, step := range analysisLog {
+		if step.Error != "" {
+			failedAreas++
+			analysisErrors = append(analysisErrors, fmt.Sprintf("%s: %s", step.AreaID, step.Error))
+		}
+	}
+	if failedAreas > 0 {
+		applog.WithFields(applog.Fields{
+			"failed_areas": failedAreas,
+			"total_areas":  len(runAreas),
+		}).Warn("Some analysis areas failed")
+	}
+
 	// Phase 5: Generate recommendations
 	applog.Info("Phase 5: Generating recommendations")
 	o.statusReporter.SetPhase(ctx, models.PhaseRecommendations, "Generating actionable recommendations...", 85)
@@ -440,6 +456,15 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 	}
 	allValidation = append(allValidation, recValidationResults...)
 
+	// Determine run type based on failures
+	if failedAreas > 0 && failedAreas == len(runAreas) {
+		// All areas failed — mark as failed run
+		runType = "failed"
+	} else if failedAreas > 0 && runType != "partial" {
+		// Some areas failed — mark as partial
+		runType = "partial"
+	}
+
 	result := &models.DiscoveryResult{
 		ProjectID:       o.projectID,
 		Domain:          o.domain,
@@ -457,6 +482,7 @@ func (o *Orchestrator) RunDiscovery(ctx context.Context, opts DiscoveryOptions) 
 			TotalInsights:        len(allInsights),
 			TotalRecommendations: len(recommendations),
 			QueriesExecuted:      explorationResult.TotalSteps,
+			Errors:               analysisErrors,
 		},
 		ExplorationLog:    explorationResult.Steps,
 		AnalysisLog:       analysisLog,

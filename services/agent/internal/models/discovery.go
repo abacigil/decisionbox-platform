@@ -136,6 +136,7 @@ type Summary struct {
 	TotalInsights        int       `bson:"total_insights" json:"total_insights"`
 	TotalRecommendations int       `bson:"total_recommendations" json:"total_recommendations"`
 	QueriesExecuted      int       `bson:"queries_executed" json:"queries_executed"`
+	Errors               []string  `bson:"errors,omitempty" json:"errors,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

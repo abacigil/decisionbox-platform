@@ -69,4 +69,7 @@ func TestLLMConfigDefaults(t *testing.T) {
 	if cfg.LLM.MaxRetries != 3 {
 		t.Errorf("MaxRetries = %d, want 3", cfg.LLM.MaxRetries)
 	}
+	if cfg.LLM.Timeout.Seconds() != 300 {
+		t.Errorf("Timeout = %v, want 300s", cfg.LLM.Timeout)
+	}
 }

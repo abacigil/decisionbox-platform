@@ -52,7 +52,7 @@ func Load() (*Config, error) {
 		},
 		LLM: LLMConfig{
 			MaxRetries:     config.GetEnvAsInt("LLM_MAX_RETRIES", 3),
-			Timeout:        parseDuration("LLM_TIMEOUT", "120s"),
+			Timeout:        parseDuration("LLM_TIMEOUT", "300s"),
 			RequestDelayMs: config.GetEnvAsInt("LLM_REQUEST_DELAY_MS", 1000),
 		},
 	}

@@ -121,6 +121,24 @@ export default function DiscoveryDetailPage() {
         </div>
       </div>
 
+      {/* Errors banner */}
+      {discovery.summary?.errors && discovery.summary.errors.length > 0 && (
+        <div style={{
+          background: 'var(--db-red-bg)', border: '1px solid var(--db-severity-critical-text)',
+          borderRadius: 'var(--db-radius-lg)', padding: '12px 16px', marginBottom: 16,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <IconAlertCircle size={16} color="var(--db-red-text)" />
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--db-red-text)' }}>
+              {discovery.summary.errors.length === 1 ? '1 area failed' : `${discovery.summary.errors.length} areas failed`} during analysis
+            </span>
+          </div>
+          {discovery.summary.errors.map((err, i) => (
+            <div key={i} style={{ fontSize: 12, color: 'var(--db-red-text)', paddingLeft: 22 }}>{err}</div>
+          ))}
+        </div>
+      )}
+
       {/* Hero KPI Cards */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24,
