@@ -21,17 +21,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
     outputs:
       api: ${{ steps.filter.outputs.api }}
       agent: ${{ steps.filter.outputs.agent }}
       dashboard: ${{ steps.filter.outputs.dashboard }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          token: ""
           filters: |
             api:
               - 'services/api/**'
