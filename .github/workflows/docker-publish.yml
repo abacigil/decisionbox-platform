@@ -148,24 +148,57 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      # ── SBOM & Security Scanning ──────────────────────────────────────
+  security:
+    name: Scan ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build]
+    if: always() && needs.build.result == 'success' && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: decisionbox-api
+            changed: ${{ needs.detect-changes.outputs.api }}
+          - service: decisionbox-agent
+            changed: ${{ needs.detect-changes.outputs.agent }}
+          - service: decisionbox-dashboard
+            changed: ${{ needs.detect-changes.outputs.dashboard }}
+
+    steps:
+      - name: Skip if unchanged
+        if: matrix.changed != 'true' && github.ref_type != 'tag'
+        run: echo "No changes for ${{ matrix.service }}, skipping" && exit 0
+
+      - name: Login to GHCR
+        if: matrix.changed == 'true' || github.ref_type == 'tag'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate SBOM with Syft
-        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        if: matrix.changed == 'true' || github.ref_type == 'tag'
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:${{ steps.meta.outputs.version }}
+          image: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:${{ github.ref_name }}
           format: spdx-json
           output-file: sbom-${{ matrix.service }}.spdx.json
 
       - name: Upload SBOM artifact
-        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        if: matrix.changed == 'true' || github.ref_type == 'tag'
         uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ matrix.service }}
           path: sbom-${{ matrix.service }}.spdx.json
 
       - name: Scan vulnerabilities with Grype
-        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        if: matrix.changed == 'true' || github.ref_type == 'tag'
         uses: anchore/scan-action@v6
         id: grype
         with:
@@ -175,14 +208,14 @@ jobs:
           severity-cutoff: critical
 
       - name: Upload Grype scan results
-        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        if: matrix.changed == 'true' || github.ref_type == 'tag'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ steps.grype.outputs.sarif }}
           category: 'grype-${{ matrix.service }}'
 
       - name: Check license compliance with Grant
-        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        if: matrix.changed == 'true' || github.ref_type == 'tag'
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/grant/main/install.sh | sh -s -- -b /usr/local/bin
           grant check sbom:sbom-${{ matrix.service }}.spdx.json --dry-run
