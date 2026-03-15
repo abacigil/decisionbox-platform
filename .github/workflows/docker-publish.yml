@@ -141,9 +141,10 @@ jobs:
 
       - name: Save image as artifact
         if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          docker save ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:${{ steps.meta.outputs.version }} \
-            -o /tmp/${{ matrix.service }}.tar
+          docker save -o /tmp/${{ matrix.service }}.tar $TAGS
 
       - name: Upload image artifact
         if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
