@@ -25,6 +25,10 @@ env:
   MONGODB_DB: "decisionbox"
   SECRET_PROVIDER: "mongodb"
   SECRET_NAMESPACE: "decisionbox"
+  RUNNER_MODE: "kubernetes"
+  AGENT_IMAGE: "ghcr.io/decisionbox-io/decisionbox-agent:latest"
+  AGENT_NAMESPACE: "decisionbox"
+  AGENT_JOB_TIMEOUT_HOURS: "6"
 
 extraEnv: {}
 
