@@ -1,3 +1,6 @@
+{{- if and (not (index .Values "mongodb" "enabled")) (not (index .Values.env "MONGODB_URI")) (not (index .Values.extraEnv "MONGODB_URI")) (not .Values.extraEnvFrom) }}
+{{- fail "mongodb.enabled is false but no MONGODB_URI provided. Set env.MONGODB_URI, extraEnv.MONGODB_URI, or extraEnvFrom with a secretRef." }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

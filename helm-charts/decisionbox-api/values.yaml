@@ -108,6 +108,10 @@ rbac:
 # ---------------------------------------------------------------------------
 # Infrastructure dependencies (disabled by default — enable per environment)
 # ---------------------------------------------------------------------------
+# When mongodb.enabled is true, MONGODB_URI is auto-computed from the subchart.
+# When mongodb.enabled is false, you MUST provide MONGODB_URI yourself via:
+#   env.MONGODB_URI, extraEnv.MONGODB_URI, or extraEnvFrom (secretRef).
+# Omitting it will cause a helm install failure.
 mongodb:
   enabled: true
   architecture: standalone
