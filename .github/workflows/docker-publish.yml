@@ -148,19 +148,41 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: Scan image with Trivy
+      # ── SBOM & Security Scanning ──────────────────────────────────────
+      - name: Generate SBOM with Syft
         if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: anchore/sbom-action@v0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:${{ steps.meta.outputs.version }}
-          format: 'sarif'
-          output: 'trivy-${{ matrix.service }}.sarif'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          image: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ matrix.service }}:${{ steps.meta.outputs.version }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.service }}.spdx.json
 
-      - name: Upload Trivy scan results
+      - name: Upload SBOM artifact
+        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service }}
+          path: sbom-${{ matrix.service }}.spdx.json
+
+      - name: Scan vulnerabilities with Grype
+        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        uses: anchore/scan-action@v6
+        id: grype
+        with:
+          sbom: sbom-${{ matrix.service }}.spdx.json
+          output-format: sarif
+          fail-build: 'false'
+          severity-cutoff: critical
+
+      - name: Upload Grype scan results
         if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-${{ matrix.service }}.sarif'
-          category: 'trivy-${{ matrix.service }}'
+          sarif_file: ${{ steps.grype.outputs.sarif }}
+          category: 'grype-${{ matrix.service }}'
+
+      - name: Check license compliance with Grant
+        if: (matrix.changed == 'true' || github.ref_type == 'tag') && github.event_name != 'pull_request'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grant/main/install.sh | sh -s -- -b /usr/local/bin
+          grant check sbom:sbom-${{ matrix.service }}.spdx.json --dry-run
