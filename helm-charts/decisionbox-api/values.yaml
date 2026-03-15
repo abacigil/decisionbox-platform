@@ -1,0 +1,110 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/decisionbox-io/decisionbox-api
+  tag: "main"
+  pullPolicy: Always
+
+namespace: decisionbox
+
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+serviceAccountName: ""
+serviceAccountAnnotations: {}
+  # iam.gke.io/gcp-service-account: "<cluster-name>-api@<project-id>.iam.gserviceaccount.com"
+
+nodeSelector: {}
+
+containerPort: 8080
+
+env:
+  MONGODB_DB: "decisionbox"
+  LLM_API_KEY: ""
+  SECRET_PROVIDER: "mongodb"
+  SECRET_NAMESPACE: "decisionbox"
+
+extraEnv: {}
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+automountServiceAccountToken: false
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+livenessProbe:
+  enabled: true
+  path: /health
+  port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  path: /health
+  port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+
+# rbac:
+#   enabled: true
+#   roleName: deployment-manager
+#   serviceAccountName: decisionbox-api
+#   rules:
+#     - apiGroups: ["apps"]
+#       resources: ["deployments"]
+#       verbs: ["get", "list", "watch"]
+#     - apiGroups: [""]
+#       resources: ["services"]
+#       verbs: ["get", "list", "watch"]
+
+# ---------------------------------------------------------------------------
+# Infrastructure dependencies (disabled by default — enable per environment)
+# ---------------------------------------------------------------------------
+mongodb:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+    rootPassword: ""
+    usernames: []
+    passwords: []
+    databases: []
+  persistence:
+    size: 1Gi
