@@ -13,6 +13,9 @@ import {
 import Link from 'next/link';
 import Shell from '@/components/layout/AppShell';
 import FeedbackButtons from '@/components/common/FeedbackButtons';
+import {
+  StatCard, SectionHeader, Th, SeverityBadge, AreaBadge, ConfidenceBar, Pill, EmptyState, normalizeConfidence,
+} from '@/components/common/UIComponents';
 import { api, DiscoveryResult, Feedback, Insight, Recommendation } from '@/lib/api';
 
 const severityOrder: Record<string, number> = {
@@ -80,7 +83,7 @@ export default function DiscoveryDetailPage() {
   const avgConfidenceRaw = totalInsights > 0
     ? insights.reduce((sum, i) => sum + (i.confidence || 0), 0) / totalInsights
     : 0;
-  const avgConfidence = avgConfidenceRaw <= 1 ? Math.round(avgConfidenceRaw * 100) : Math.round(avgConfidenceRaw);
+  const avgConfidence = normalizeConfidence(avgConfidenceRaw);
 
   const durationSec = discovery.duration ? (discovery.duration / 1000000000).toFixed(2) : '—';
 
@@ -378,10 +381,6 @@ function InsightRow({ insight, projectId, runId, idx, feedback, onFeedbackUpdate
   insight: Insight; projectId: string; runId: string; idx: number;
   feedback?: Feedback; onFeedbackUpdate: (fb: Feedback | null) => void;
 }) {
-  const confidencePct = insight.confidence <= 1 ? Math.round(insight.confidence * 100) : Math.round(insight.confidence);
-  const confidenceColor = confidencePct >= 80 ? 'var(--db-green-text)'
-    : confidencePct >= 60 ? 'var(--db-amber-text)' : 'var(--db-red-text)';
-
   return (
     <tr style={{ borderBottom: '1px solid var(--db-border-default)' }}
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--db-bg-muted)'; }}
@@ -403,27 +402,13 @@ function InsightRow({ insight, projectId, runId, idx, feedback, onFeedbackUpdate
         <SeverityBadge severity={insight.severity} type="severity" />
       </td>
       <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
-        <span style={{
-          fontSize: 11, padding: '1px 6px', borderRadius: 'var(--db-radius)',
-          background: 'var(--db-bg-muted)', color: 'var(--db-text-secondary)',
-        }}>{insight.analysis_area}</span>
+        <AreaBadge area={insight.analysis_area} />
       </td>
       <td style={{ padding: '10px 12px', textAlign: 'right', verticalAlign: 'top', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
         {insight.affected_count > 0 ? insight.affected_count.toLocaleString() : '—'}
       </td>
       <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 48, height: 4, background: 'var(--db-border-default)', borderRadius: 2,
-            display: 'inline-block', position: 'relative', overflow: 'hidden',
-          }}>
-            <span style={{
-              position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2,
-              width: `${confidencePct}%`, background: confidenceColor,
-            }} />
-          </span>
-          <span style={{ fontSize: 11, color: 'var(--db-text-secondary)' }}>{confidencePct}%</span>
-        </span>
+        <ConfidenceBar confidence={insight.confidence} />
       </td>
       <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
         <FeedbackButtons projectId={projectId} discoveryId={runId} targetType="insight"
@@ -489,7 +474,7 @@ function RecommendationCard({ rec, projectId, discoveryId, idx, insights, feedba
         {rec.expected_impact?.metric && (
           <span>{rec.expected_impact.metric}</span>
         )}
-        {rec.confidence > 0 && <span>Confidence: {rec.confidence <= 1 ? Math.round(rec.confidence * 100) : Math.round(rec.confidence)}%</span>}
+        {rec.confidence > 0 && <span>Confidence: {normalizeConfidence(rec.confidence)}%</span>}
       </div>
 
       {/* Related Insights */}
@@ -547,95 +532,7 @@ function RecommendationCard({ rec, projectId, discoveryId, idx, insights, feedba
   );
 }
 
-/* ========== Small UI Components ========== */
-
-function StatCard({ label, value, subtitle, valueColor }: {
-  label: string; value: number | string; subtitle?: string; valueColor?: string;
-}) {
-  return (
-    <div style={{
-      background: 'var(--db-bg-white)',
-      border: '1px solid var(--db-border-default)',
-      borderRadius: 'var(--db-radius-lg)',
-      padding: 16,
-    }}>
-      <div style={{
-        fontSize: 11, fontWeight: 500, textTransform: 'uppercase',
-        letterSpacing: '0.5px', color: 'var(--db-text-tertiary)', marginBottom: 4,
-      }}>{label}</div>
-      <div style={{
-        fontSize: 22, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
-        color: valueColor || 'var(--db-text-primary)', lineHeight: 1.3,
-      }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
-      {subtitle && (
-        <div style={{ fontSize: 12, color: 'var(--db-text-tertiary)', marginTop: 2 }}>{subtitle}</div>
-      )}
-    </div>
-  );
-}
-
-function SectionHeader({ title, count }: { title: string; count?: number }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, marginTop: 8 }}>
-      <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--db-text-primary)' }}>{title}</span>
-      {count !== undefined && (
-        <span style={{ fontSize: 13, color: 'var(--db-text-tertiary)', marginLeft: 6 }}>{count}</span>
-      )}
-    </div>
-  );
-}
-
-function Th({ children, width, align }: { children: React.ReactNode; width?: string; align?: string }) {
-  return (
-    <th style={{
-      fontSize: 11, fontWeight: 500, color: 'var(--db-text-tertiary)',
-      textTransform: 'uppercase', letterSpacing: '0.5px',
-      padding: '8px 12px', borderBottom: '1px solid var(--db-border-default)',
-      textAlign: (align as 'left' | 'right') || 'left', width,
-    }}>{children}</th>
-  );
-}
-
-function SeverityBadge({ severity, type }: { severity: string; type: 'severity' | 'status' | 'validation' }) {
-  const severityColors: Record<string, { bg: string; color: string }> = {
-    critical: { bg: 'var(--db-severity-critical-bg)', color: 'var(--db-severity-critical-text)' },
-    high: { bg: 'var(--db-severity-high-bg)', color: 'var(--db-severity-high-text)' },
-    medium: { bg: 'var(--db-severity-medium-bg)', color: 'var(--db-severity-medium-text)' },
-    low: { bg: 'var(--db-severity-low-bg)', color: 'var(--db-severity-low-text)' },
-  };
-  const statusColors: Record<string, { bg: string; color: string }> = {
-    Complete: { bg: 'var(--db-green-bg)', color: 'var(--db-green-text)' },
-    Partial: { bg: 'var(--db-amber-bg)', color: 'var(--db-amber-text)' },
-    Failed: { bg: 'var(--db-red-bg)', color: 'var(--db-red-text)' },
-    confirmed: { bg: 'var(--db-green-bg)', color: 'var(--db-green-text)' },
-    adjusted: { bg: 'var(--db-amber-bg)', color: 'var(--db-amber-text)' },
-    rejected: { bg: 'var(--db-red-bg)', color: 'var(--db-red-text)' },
-    error: { bg: 'var(--db-red-bg)', color: 'var(--db-red-text)' },
-  };
-
-  const colors = type === 'severity'
-    ? severityColors[severity.toLowerCase()] || { bg: 'var(--db-bg-muted)', color: 'var(--db-text-secondary)' }
-    : statusColors[severity] || { bg: 'var(--db-bg-muted)', color: 'var(--db-text-secondary)' };
-
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 500, padding: '1px 6px',
-      borderRadius: 'var(--db-radius)',
-      background: colors.bg, color: colors.color,
-      display: 'inline-block',
-    }}>{severity}</span>
-  );
-}
-
-function Pill({ bg, color, children }: { bg: string; color: string; children: React.ReactNode }) {
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 500, padding: '2px 8px',
-      borderRadius: 'var(--db-radius)', whiteSpace: 'nowrap',
-      background: bg, color: color,
-    }}>{children}</span>
-  );
-}
+/* ========== Page-Specific Components ========== */
 
 function MicroBadge({ children, color }: { children: React.ReactNode; color?: 'red' | 'amber' }) {
   const bg = color === 'red' ? 'var(--db-red-bg)' : color === 'amber' ? 'var(--db-amber-bg)' : 'var(--db-bg-muted)';
@@ -685,17 +582,3 @@ function SortDropdown({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function EmptyState({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div style={{
-      background: 'var(--db-bg-white)',
-      border: '2px dashed var(--db-border-strong)',
-      borderRadius: 'var(--db-radius-lg)',
-      padding: 48, textAlign: 'center',
-    }}>
-      <div style={{ opacity: 0.3, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--db-text-secondary)', marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 13, color: 'var(--db-text-tertiary)' }}>{description}</div>
-    </div>
-  );
-}

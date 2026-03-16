@@ -143,16 +143,16 @@ export default function Shell({ children, breadcrumb, actions }: ShellProps) {
               active={isActive(`/projects/${projectId}`)}
             />
             <NavItem
-              href={`/projects/${projectId}`}
+              href={`/projects/${projectId}/insights`}
               icon={<IconBook2 size={16} />}
               label="Insights"
-              active={false}
+              active={isActive(`/projects/${projectId}/insights`)}
             />
             <NavItem
-              href={`/projects/${projectId}`}
+              href={`/projects/${projectId}/recommendations`}
               icon={<IconStack2 size={16} />}
               label="Recommendations"
-              active={false}
+              active={isActive(`/projects/${projectId}/recommendations`)}
             />
 
             {/* Configure section */}
