@@ -1,0 +1,19 @@
+name: Trigger Docs Rebuild
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+
+jobs:
+  trigger:
+    name: Trigger docs site rebuild
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch to docs repo
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DOCS_DEPLOY_TOKEN }}
+          repository: decisionbox-io/decisionbox-platform-docs
+          event-type: docs-updated
