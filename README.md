@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logos/logo@2x.png" alt="DecisionBox" width="400" />
+  <img src="assets/logos/logo-light@2x.png" alt="DecisionBox" width="400" />
 </p>
 
 <p align="center">
