@@ -83,9 +83,9 @@ For production MongoDB:
 
 | Endpoint | Purpose | Frequency |
 |----------|---------|-----------|
-| `GET /health` | Liveness (API process alive) | K8s: every 10s |
+| `GET /health` | Liveness (API process alive) | K8s: every 30s (API), 15s (Dashboard) |
 | `GET /health/ready` | Readiness (MongoDB connected) | K8s: every 10s |
-| `GET /health` on :3000 | Dashboard + API connectivity | K8s: every 30s |
+| `GET /health` on :3000 | Dashboard liveness | K8s: every 15s |
 
 ### Logs
 
@@ -155,5 +155,8 @@ db.discoveries.deleteMany({
 
 ## Next Steps
 
-- [Docker Compose](docker.md) — Deployment with Docker
+- [Docker Compose](docker.md) — Single-server deployment
+- [Kubernetes (Helm)](kubernetes.md) — Production deployment on K8s
+- [Terraform GCP](terraform-gcp.md) — Automated GKE cluster provisioning
+- [Helm Values Reference](../reference/helm-values.md) — Complete chart configuration
 - [Configuration Reference](../reference/configuration.md) — All environment variables
