@@ -481,3 +481,4 @@ func runDiscovery(cfg *config.Config, projectID string, runID string, selectedAr
 
 	return nil
 }
+

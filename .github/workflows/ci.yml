@@ -78,26 +78,34 @@ jobs:
         run: |
           COV="${GITHUB_WORKSPACE}/coverage"
           mkdir -p "$COV"
-          (cd libs/go-common && go test -coverprofile="$COV/go-common.out" ./...)
-          (cd domain-packs/gaming/go && go test -coverprofile="$COV/gaming.out" ./...)
-          (cd domain-packs/social/go && go test -coverprofile="$COV/social.out" ./...)
-          (cd providers/llm/claude && go test -coverprofile="$COV/llm-claude.out" ./...)
-          (cd providers/llm/openai && go test -coverprofile="$COV/llm-openai.out" ./...)
-          (cd providers/llm/ollama && go test -coverprofile="$COV/llm-ollama.out" ./...)
-          (cd providers/llm/vertex-ai && go test -coverprofile="$COV/llm-vertex.out" ./...)
-          (cd providers/llm/bedrock && go test -coverprofile="$COV/llm-bedrock.out" ./...)
-          (cd providers/secrets/mongodb && go test -coverprofile="$COV/secrets-mongodb.out" ./...)
-          (cd providers/secrets/gcp && go test -coverprofile="$COV/secrets-gcp.out" ./...)
-          (cd providers/secrets/aws && go test -coverprofile="$COV/secrets-aws.out" ./...)
-          (cd providers/warehouse/bigquery && go test -coverprofile="$COV/warehouse-bigquery.out" ./...)
-          (cd providers/warehouse/redshift && go test -coverprofile="$COV/warehouse-redshift.out" ./...)
-          (cd services/agent && go test -coverprofile="$COV/agent.out" ./...)
-          (cd services/api && go test -coverprofile="$COV/api.out" ./...)
+          (cd libs/go-common && go test -coverprofile="$COV/go-common.txt" ./...)
+          (cd domain-packs/gaming/go && go test -coverprofile="$COV/gaming.txt" ./...)
+          (cd domain-packs/social/go && go test -coverprofile="$COV/social.txt" ./...)
+          (cd providers/llm/claude && go test -coverprofile="$COV/llm-claude.txt" ./...)
+          (cd providers/llm/openai && go test -coverprofile="$COV/llm-openai.txt" ./...)
+          (cd providers/llm/ollama && go test -coverprofile="$COV/llm-ollama.txt" ./...)
+          (cd providers/llm/vertex-ai && go test -coverprofile="$COV/llm-vertex.txt" ./...)
+          (cd providers/llm/bedrock && go test -coverprofile="$COV/llm-bedrock.txt" ./...)
+          (cd providers/secrets/mongodb && go test -coverprofile="$COV/secrets-mongodb.txt" ./...)
+          (cd providers/secrets/gcp && go test -coverprofile="$COV/secrets-gcp.txt" ./...)
+          (cd providers/secrets/aws && go test -coverprofile="$COV/secrets-aws.txt" ./...)
+          (cd providers/warehouse/bigquery && go test -coverprofile="$COV/warehouse-bigquery.txt" ./...)
+          (cd providers/warehouse/redshift && go test -coverprofile="$COV/warehouse-redshift.txt" ./...)
+          (cd services/agent && go test -coverprofile="$COV/agent.txt" ./...)
+          (cd services/api && go test -coverprofile="$COV/api.txt" ./...)
 
-      - name: Upload coverage to Codecov
+      - name: Merge coverage profiles
+        run: |
+          echo "mode: set" > coverage/coverage.txt
+          for f in coverage/*.txt; do
+            [ "$f" = "coverage/coverage.txt" ] && continue
+            tail -n +2 "$f" >> coverage/coverage.txt
+          done
+
+      - name: Upload Go coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          directory: coverage
+          files: coverage/coverage.txt
           flags: go
           token: ${{ secrets.CODECOV_TOKEN }}
 
