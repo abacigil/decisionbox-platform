@@ -85,3 +85,4 @@ func (h *Handler) ReadinessHandler() http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
+// coverage
