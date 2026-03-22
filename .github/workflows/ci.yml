@@ -99,7 +99,7 @@ jobs:
           echo "mode: set" > coverage/coverage.txt
           for f in coverage/*.txt; do
             [ "$f" = "coverage/coverage.txt" ] && continue
-            tail -n +2 "$f" >> coverage/coverage.txt
+            tail -n +2 "$f" | sed 's|github.com/decisionbox-io/decisionbox/||g' >> coverage/coverage.txt
           done
 
       - name: Upload Go coverage to Codecov
