@@ -151,8 +151,9 @@ func TestFactoryPasswordAuth(t *testing.T) {
 	}
 }
 
-func TestFactoryKeyPairAuth(t *testing.T) {
-	// Generate a test RSA key pair
+func TestFactoryPasswordWithPEMFallback(t *testing.T) {
+	// Without auth_method set, PEM content is treated as password (not key pair).
+	// This tests backward compatibility — the correct way is TestFactoryKeyPairAuthMethod.
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("failed to generate RSA key: %v", err)
@@ -166,6 +167,7 @@ func TestFactoryKeyPairAuth(t *testing.T) {
 		Bytes: pkcs8Bytes,
 	})
 
+	// Without auth_method, defaults to "password" — PEM is used as password string
 	p, err := gowarehouse.NewProvider("snowflake", gowarehouse.ProviderConfig{
 		"account":          "org-acct",
 		"user":             "test",
@@ -622,8 +624,193 @@ func TestFactoryNoCredentials(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing credentials")
 	}
-	if !strings.Contains(err.Error(), "credentials") {
-		t.Errorf("error should mention 'credentials', got: %v", err)
+	if !strings.Contains(err.Error(), "password is required") {
+		t.Errorf("error should mention 'password is required', got: %v", err)
+	}
+}
+
+func TestFactoryKeyPairAuthMethod(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	pkcs8, _ := x509.MarshalPKCS8PrivateKey(key)
+	pemStr := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8}))
+
+	p, err := gowarehouse.NewProvider("snowflake", gowarehouse.ProviderConfig{
+		"account":          "org-acct",
+		"user":             "test",
+		"warehouse":        "WH",
+		"database":         "DB",
+		"auth_method":      "key_pair",
+		"credentials_json": pemStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer p.Close()
+}
+
+func TestFactoryKeyPairMissingKey(t *testing.T) {
+	_, err := gowarehouse.NewProvider("snowflake", gowarehouse.ProviderConfig{
+		"account":     "org-acct",
+		"user":        "test",
+		"warehouse":   "WH",
+		"database":    "DB",
+		"auth_method": "key_pair",
+	})
+	if err == nil {
+		t.Fatal("expected error for missing PEM key")
+	}
+	if !strings.Contains(err.Error(), "PEM private key is required") {
+		t.Errorf("error should mention PEM, got: %v", err)
+	}
+}
+
+func TestFactoryUnsupportedAuthMethod(t *testing.T) {
+	_, err := gowarehouse.NewProvider("snowflake", gowarehouse.ProviderConfig{
+		"account":     "org-acct",
+		"user":        "test",
+		"warehouse":   "WH",
+		"database":    "DB",
+		"auth_method": "oauth",
+		"password":    "pw",
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported auth method")
+	}
+	if !strings.Contains(err.Error(), "unsupported auth method") {
+		t.Errorf("error should mention unsupported, got: %v", err)
+	}
+}
+
+func TestAuthMethodFields(t *testing.T) {
+	meta, _ := gowarehouse.GetProviderMeta("snowflake")
+
+	// Password should have 1 credential field
+	var pwMethod, kpMethod *gowarehouse.AuthMethod
+	for i := range meta.AuthMethods {
+		switch meta.AuthMethods[i].ID {
+		case "password":
+			pwMethod = &meta.AuthMethods[i]
+		case "key_pair":
+			kpMethod = &meta.AuthMethods[i]
+		}
+	}
+
+	if pwMethod == nil {
+		t.Fatal("missing password auth method")
+		return
+	}
+	if len(pwMethod.Fields) != 1 || pwMethod.Fields[0].Type != "credential" {
+		t.Error("password method should have 1 credential field")
+	}
+	if kpMethod == nil {
+		t.Fatal("missing key_pair auth method")
+		return
+	}
+	if len(kpMethod.Fields) != 1 || kpMethod.Fields[0].Type != "credential" {
+		t.Error("key_pair method should have 1 credential field")
+	}
+}
+
+func TestQueryErrorWrapping(t *testing.T) {
+	mock := &mockSFClient{
+		queryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			return nil, fmt.Errorf("syntax error at position 42")
+		},
+	}
+	p := &SnowflakeProvider{client: mock, timeout: 5 * time.Second}
+
+	_, err := p.Query(context.Background(), "SELECT BAD", nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "snowflake:") {
+		t.Errorf("error should be wrapped with 'snowflake:', got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "syntax error") {
+		t.Errorf("error should contain original message, got: %v", err)
+	}
+}
+
+func TestListTablesInDatasetEmpty(t *testing.T) {
+	mock := &mockSFClient{
+		queryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			return nil, fmt.Errorf("schema not found")
+		},
+	}
+	p := &SnowflakeProvider{client: mock, schema: "NONEXISTENT", database: "DB"}
+
+	_, err := p.ListTablesInDataset(context.Background(), "NONEXISTENT")
+	if err == nil {
+		t.Error("expected error for nonexistent schema")
+	}
+}
+
+func TestListTablesUsesDefaultSchema(t *testing.T) {
+	var capturedArgs []interface{}
+	mock := &mockSFClient{
+		queryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			capturedArgs = args
+			return nil, fmt.Errorf("expected")
+		},
+	}
+	p := &SnowflakeProvider{client: mock, schema: "CUSTOM_SCHEMA", database: "DB"}
+
+	_, _ = p.ListTables(context.Background())
+	if len(capturedArgs) == 0 {
+		t.Fatal("expected query args")
+	}
+	if capturedArgs[0] != "CUSTOM_SCHEMA" {
+		t.Errorf("expected schema 'CUSTOM_SCHEMA', got %v", capturedArgs[0])
+	}
+}
+
+func TestGetTableSchemaInDatasetError(t *testing.T) {
+	mock := &mockSFClient{
+		queryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			return nil, fmt.Errorf("table not found")
+		},
+	}
+	p := &SnowflakeProvider{client: mock, schema: "PUBLIC", database: "DB"}
+
+	_, err := p.GetTableSchemaInDataset(context.Background(), "PUBLIC", "MISSING")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestValidateReadOnlyError(t *testing.T) {
+	// ValidateReadOnly needs QueryContext to return *sql.Rows successfully
+	// Since we can't mock sql.Rows easily, test the error path
+	mock := &mockSFClient{
+		queryFunc: func(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+			return nil, fmt.Errorf("access denied")
+		},
+	}
+	p := &SnowflakeProvider{client: mock}
+
+	err := p.ValidateReadOnly(context.Background())
+	if err == nil {
+		t.Error("expected error when query fails")
+	}
+	if !strings.Contains(err.Error(), "read-only validation failed") {
+		t.Errorf("wrong error message: %v", err)
+	}
+}
+
+func TestRegisteredAuthMethods(t *testing.T) {
+	meta, _ := gowarehouse.GetProviderMeta("snowflake")
+	if len(meta.AuthMethods) != 2 {
+		t.Fatalf("expected 2 auth methods, got %d", len(meta.AuthMethods))
+	}
+	ids := map[string]bool{}
+	for _, m := range meta.AuthMethods {
+		ids[m.ID] = true
+	}
+	if !ids["password"] {
+		t.Error("missing 'password' auth method")
+	}
+	if !ids["key_pair"] {
+		t.Error("missing 'key_pair' auth method")
 	}
 }
 

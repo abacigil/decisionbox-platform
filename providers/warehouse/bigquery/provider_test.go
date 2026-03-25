@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"context"
 	"testing"
 
 	gowarehouse "github.com/decisionbox-io/decisionbox/libs/go-common/warehouse"
@@ -38,7 +39,7 @@ func TestBigQueryConfig_WithoutCredentials(t *testing.T) {
 }
 
 func TestNewBigQueryProvider_MissingProjectID(t *testing.T) {
-	_, err := NewBigQueryProvider(nil, BigQueryConfig{
+	_, err := NewBigQueryProvider(context.TODO(), BigQueryConfig{
 		Dataset: "test",
 	})
 	if err == nil {
@@ -47,7 +48,7 @@ func TestNewBigQueryProvider_MissingProjectID(t *testing.T) {
 }
 
 func TestNewBigQueryProvider_MissingDataset(t *testing.T) {
-	_, err := NewBigQueryProvider(nil, BigQueryConfig{
+	_, err := NewBigQueryProvider(context.TODO(), BigQueryConfig{
 		ProjectID: "test",
 	})
 	if err == nil {
@@ -57,7 +58,7 @@ func TestNewBigQueryProvider_MissingDataset(t *testing.T) {
 
 func TestNewBigQueryProvider_InvalidCredentials(t *testing.T) {
 	// Invalid JSON credentials should fail at client creation
-	_, err := NewBigQueryProvider(nil, BigQueryConfig{
+	_, err := NewBigQueryProvider(context.TODO(), BigQueryConfig{
 		ProjectID:       "test",
 		Dataset:         "test",
 		CredentialsJSON: "not-valid-json",
@@ -121,6 +122,7 @@ func TestBigQueryFactory_CredentialsPassthrough(t *testing.T) {
 	_, err := gowarehouse.NewProvider("bigquery", gowarehouse.ProviderConfig{
 		"project_id":       "test-project",
 		"dataset":          "test_dataset",
+		"auth_method":      "sa_key",
 		"credentials_json": `{"type":"invalid"}`,
 	})
 	if err == nil {
@@ -177,6 +179,116 @@ func TestBigQueryProvider_GetDataset(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRegisteredAuthMethods(t *testing.T) {
+	meta, ok := gowarehouse.GetProviderMeta("bigquery")
+	if !ok {
+		t.Fatal("bigquery not registered")
+	}
+	if len(meta.AuthMethods) != 2 {
+		t.Fatalf("expected 2 auth methods, got %d", len(meta.AuthMethods))
+	}
+	ids := map[string]bool{}
+	for _, m := range meta.AuthMethods {
+		ids[m.ID] = true
+	}
+	if !ids["adc"] {
+		t.Error("missing 'adc' auth method")
+	}
+	if !ids["sa_key"] {
+		t.Error("missing 'sa_key' auth method")
+	}
+}
+
+func TestBigQueryFactory_SAKeyMissing(t *testing.T) {
+	_, err := gowarehouse.NewProvider("bigquery", gowarehouse.ProviderConfig{
+		"project_id":  "test-project",
+		"dataset":     "test_dataset",
+		"auth_method": "sa_key",
+	})
+	if err == nil {
+		t.Fatal("expected error for missing SA key")
+	}
+	if !bqContains(err.Error(), "service account key is required") {
+		t.Errorf("wrong error: %v", err)
+	}
+}
+
+func TestBigQueryFactory_UnsupportedAuthMethod(t *testing.T) {
+	_, err := gowarehouse.NewProvider("bigquery", gowarehouse.ProviderConfig{
+		"project_id":  "test-project",
+		"dataset":     "test_dataset",
+		"auth_method": "oauth",
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported auth method")
+	}
+	if !bqContains(err.Error(), "unsupported auth method") {
+		t.Errorf("wrong error: %v", err)
+	}
+}
+
+func TestBigQueryProvider_AuthMethodSAKey_InvalidJSON(t *testing.T) {
+	_, err := gowarehouse.NewProvider("bigquery", gowarehouse.ProviderConfig{
+		"project_id":      "test-project",
+		"dataset":         "test_dataset",
+		"auth_method":     "sa_key",
+		"credentials_json": "not-valid-json",
+	})
+	if err == nil {
+		t.Error("expected error for invalid SA key JSON")
+	}
+}
+
+func TestBigQueryProvider_AuthMethodFields(t *testing.T) {
+	meta, _ := gowarehouse.GetProviderMeta("bigquery")
+
+	// ADC should have no fields
+	adc := findAuthMethod(meta.AuthMethods, "adc")
+	if adc == nil {
+		t.Fatal("missing adc auth method")
+	}
+	if len(adc.Fields) != 0 {
+		t.Errorf("ADC should have 0 fields, got %d", len(adc.Fields))
+	}
+
+	// SA Key should have 1 credential field
+	saKey := findAuthMethod(meta.AuthMethods, "sa_key")
+	if saKey == nil {
+		t.Fatal("missing sa_key auth method")
+	}
+	if len(saKey.Fields) != 1 {
+		t.Fatalf("SA Key should have 1 field, got %d", len(saKey.Fields))
+	}
+	if saKey.Fields[0].Type != "credential" {
+		t.Errorf("SA Key field should be type 'credential', got %q", saKey.Fields[0].Type)
+	}
+	if !saKey.Fields[0].Required {
+		t.Error("SA Key credential field should be required")
+	}
+}
+
+func TestBigQueryProvider_DefaultPricing(t *testing.T) {
+	meta, _ := gowarehouse.GetProviderMeta("bigquery")
+	if meta.DefaultPricing == nil {
+		t.Fatal("expected default pricing")
+	}
+	if meta.DefaultPricing.CostModel != "per_byte_scanned" {
+		t.Errorf("expected cost model 'per_byte_scanned', got %q", meta.DefaultPricing.CostModel)
+	}
+	if meta.DefaultPricing.CostPerTBScannedUSD != 6.25 {
+		t.Errorf("expected 6.25, got %f", meta.DefaultPricing.CostPerTBScannedUSD)
+	}
+}
+
+func findAuthMethod(methods []gowarehouse.AuthMethod, id string) *gowarehouse.AuthMethod {
+	for i := range methods {
+		if methods[i].ID == id {
+			return &methods[i]
+		}
+	}
+	return nil
 }
 
 func bqContains(s, substr string) bool {
