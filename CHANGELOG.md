@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Redshift external authentication** — Access Keys (`StaticCredentialsProvider`) and Assume Role (`stscreds.NewAssumeRoleProvider` with optional external ID) for cross-cloud and cross-account access.
 - **Azure AI Foundry LLM provider** — Access Claude and OpenAI models through Microsoft Azure's managed AI platform. Routes to Anthropic Messages API (`/anthropic/v1/messages`) or OpenAI Chat Completions API (`/openai/v1/chat/completions`) based on model name. Supports API key authentication.
 - **Azure Key Vault secret provider** — Store per-project secrets in Azure Key Vault with DefaultAzureCredential authentication (managed identity, Azure CLI, environment variables). Secret naming uses `{namespace}-{projectID}-{key}` format with managed-by tags for filtering.
+- **Azure Terraform module** — Provision AKS, VNet, NAT Gateway, Managed Identities, and Key Vault on Azure. Follows the same module pattern as GCP and AWS. Includes Workload Identity federation, Container Insights, and deployment documentation.
+- **Setup wizard Azure support** — The interactive setup wizard (`terraform/setup.sh`) now supports Azure as a third cloud provider. Handles `az login` authentication, Azure Blob Storage state backend, AKS credential configuration, Workload Identity annotations, and Key Vault integration.
+- **Helm chart Azure Workload Identity** — Added `podLabels` support to API deployment template for `azure.workload.identity/use` label. Updated service account annotation examples for all three cloud providers (GCP, AWS, Azure).
 
 ### Changed
 

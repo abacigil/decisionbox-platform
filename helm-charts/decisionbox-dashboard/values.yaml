@@ -64,6 +64,10 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
+# podLabels is not needed for the dashboard since it does not authenticate
+# to Azure services directly. Workload Identity labels are only required on
+# the API pods which access Key Vault and other cloud resources.
+
 automountServiceAccountToken: false
 
 service:
@@ -73,7 +77,7 @@ service:
 ingress:
   enabled: true
   # Set ingressClassName for your cluster's ingress controller.
-  # Examples: "nginx", "alb" (AWS), "gce" (GCP)
+  # Examples: "nginx", "alb" (AWS), "gce" (GCP), "webapprouting.kubernetes.azure.com" (Azure)
   ingressClassName: ""
   annotations: {}
     # AWS ALB example:
@@ -81,6 +85,8 @@ ingress:
     #   alb.ingress.kubernetes.io/target-type: ip
     # GCP example:
     #   kubernetes.io/ingress.class: gce
+    # Azure example:
+    #   (uses Web App Routing or nginx ingress controller — no special annotations needed)
   # Set host for domain-based routing (e.g., dashboard.example.com).
   # Leave empty for path-based catch-all (suitable for dev/testing).
   host: ""
