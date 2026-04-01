@@ -24,6 +24,7 @@ COPY providers/secrets/azure/go.mod providers/secrets/azure/go.sum providers/sec
 COPY domain-packs/gaming/go/go.mod domain-packs/gaming/go/
 COPY domain-packs/social/go/go.mod domain-packs/social/go/
 COPY domain-packs/system-test/go/go.mod domain-packs/system-test/go/
+COPY domain-packs/travel/go/go.mod domain-packs/travel/go/
 COPY services/api/go.mod services/api/go.sum services/api/
 # Download deps
 WORKDIR /workspace/services/api

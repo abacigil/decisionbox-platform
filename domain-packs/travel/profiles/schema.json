@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Travel Project Profile",
+  "description": "Profile schema for travel domain projects. Provides context to the AI agent about the platform's business model, property types, and target market.",
+  "type": "object",
+  "properties": {
+    "platform_info": {
+      "type": "object",
+      "title": "Platform Information",
+      "properties": {
+        "platform_type": {
+          "type": "string",
+          "title": "Platform Type",
+          "enum": ["marketplace", "direct_operator", "ota", "property_manager", "hybrid"],
+          "description": "Marketplace (Airbnb), Direct Operator (hotel chain), OTA (Booking.com), Property Manager (Vacasa)"
+        },
+        "market_focus": {
+          "type": "string",
+          "title": "Market Focus",
+          "enum": ["domestic", "international", "both"],
+          "description": "Primary market geography"
+        },
+        "regions": {
+          "type": "array",
+          "title": "Operating Regions",
+          "items": { "type": "string" },
+          "description": "E.g., 'North America', 'Europe', 'Southeast Asia'"
+        },
+        "description": {
+          "type": "string",
+          "title": "Platform Description",
+          "description": "Brief description of the platform"
+        }
+      }
+    },
+    "booking_model": {
+      "type": "object",
+      "title": "Booking Model",
+      "properties": {
+        "booking_type": {
+          "type": "string",
+          "title": "Booking Type",
+          "enum": ["instant_book", "request_to_book", "both"],
+          "description": "How guests initiate bookings"
+        },
+        "cancellation_policy": {
+          "type": "string",
+          "title": "Default Cancellation Policy",
+          "enum": ["flexible", "moderate", "strict", "non_refundable", "host_defined"],
+          "description": "Platform default or most common policy"
+        },
+        "min_stay_nights": {
+          "type": "integer",
+          "title": "Minimum Stay (nights)",
+          "description": "Platform minimum or most common minimum"
+        },
+        "avg_lead_time_days": {
+          "type": "integer",
+          "title": "Avg Booking Lead Time (days)",
+          "description": "Average days between booking and check-in"
+        },
+        "avg_stay_duration_nights": {
+          "type": "number",
+          "title": "Avg Stay Duration (nights)"
+        }
+      }
+    },
+    "monetization": {
+      "type": "object",
+      "title": "Monetization",
+      "properties": {
+        "revenue_model": {
+          "type": "string",
+          "title": "Revenue Model",
+          "enum": ["guest_fee", "host_commission", "split_fee", "subscription", "hybrid"],
+          "description": "How the platform generates revenue"
+        },
+        "guest_fee_pct": {
+          "type": "number",
+          "title": "Guest Service Fee (%)",
+          "description": "Service fee charged to guests"
+        },
+        "host_commission_pct": {
+          "type": "number",
+          "title": "Host Commission (%)",
+          "description": "Commission taken from host payouts"
+        },
+        "has_cleaning_fee": { "type": "boolean", "title": "Has Cleaning Fee" },
+        "has_security_deposit": { "type": "boolean", "title": "Has Security Deposit" },
+        "payment_methods": {
+          "type": "array",
+          "title": "Payment Methods",
+          "items": { "type": "string", "enum": ["credit_card", "debit_card", "paypal", "bank_transfer", "crypto", "apple_pay", "google_pay"] }
+        }
+      }
+    },
+    "growth_features": {
+      "type": "object",
+      "title": "Growth Features",
+      "properties": {
+        "has_referral_program": { "type": "boolean", "title": "Has Referral Program" },
+        "has_loyalty_program": { "type": "boolean", "title": "Has Loyalty/Rewards Program" },
+        "has_push_notifications": { "type": "boolean", "title": "Has Push Notifications" },
+        "has_wishlist": { "type": "boolean", "title": "Has Wishlist/Saved Listings" },
+        "has_price_alerts": { "type": "boolean", "title": "Has Price Drop Alerts" }
+      }
+    },
+    "kpis": {
+      "type": "object",
+      "title": "Target KPIs",
+      "properties": {
+        "booking_conversion_rate_target": { "type": "number", "title": "Booking Conversion Rate Target (%)" },
+        "avg_booking_value_target": { "type": "number", "title": "Avg Booking Value Target ($)" },
+        "guest_satisfaction_target": { "type": "number", "title": "Guest Satisfaction Target (1-5)" },
+        "host_retention_target": { "type": "number", "title": "Annual Host Retention Target (%)" },
+        "repeat_booking_rate_target": { "type": "number", "title": "Repeat Booking Rate Target (%)" },
+        "avg_occupancy_target": { "type": "number", "title": "Avg Occupancy Rate Target (%)" }
+      }
+    }
+  }
+}

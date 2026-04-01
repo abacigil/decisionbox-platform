@@ -30,6 +30,7 @@ import (
 	_ "github.com/decisionbox-io/decisionbox/domain-packs/gaming/go"
 	_ "github.com/decisionbox-io/decisionbox/domain-packs/social/go"
 	_ "github.com/decisionbox-io/decisionbox/domain-packs/system-test/go" // env-gated
+	_ "github.com/decisionbox-io/decisionbox/domain-packs/travel/go"
 
 	// LLM provider registrations (for /api/v1/providers/llm listing)
 	_ "github.com/decisionbox-io/decisionbox/providers/llm/claude"

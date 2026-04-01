@@ -1,0 +1,42 @@
+[
+  {
+    "id": "booking_conversion",
+    "name": "Booking Conversion",
+    "description": "Search-to-book funnel analysis — conversion rates at each stage (search, view, inquiry, book), abandonment patterns, and booking velocity by channel, device, and destination",
+    "keywords": ["booking", "conversion", "funnel", "search", "view", "click", "clickstream", "page_view", "abandon", "inquiry", "request", "instant_book", "confirmation", "checkout", "cart", "availability", "calendar", "device", "mobile", "desktop", "channel"],
+    "priority": 1,
+    "prompt_file": "analysis_booking_conversion.md"
+  },
+  {
+    "id": "revenue",
+    "name": "Revenue & Pricing",
+    "description": "Revenue trends, pricing patterns, seasonal demand, payment method mix, average booking value, revenue concentration, refund impact, and host payout economics",
+    "keywords": ["revenue", "price", "pricing", "payment", "amount", "total", "fee", "commission", "average", "nightly", "rate", "seasonal", "demand", "payout", "transaction", "refund", "currency", "adr", "revpar", "yield", "cleaning_fee", "service_fee"],
+    "priority": 2,
+    "prompt_file": "analysis_revenue.md"
+  },
+  {
+    "id": "guest_retention",
+    "name": "Guest Retention",
+    "description": "Repeat booking behavior, guest cohort retention, churn risk identification, reactivation opportunities, seasonal rebooking patterns, and loyalty across segments",
+    "keywords": ["retention", "repeat", "return", "cohort", "churn", "inactive", "lapsed", "loyal", "first_booking", "last_booking", "days_since", "lifetime", "ltv", "frequency", "reactivation", "seasonal", "rebooking"],
+    "priority": 3,
+    "prompt_file": "analysis_guest_retention.md"
+  },
+  {
+    "id": "cancellation",
+    "name": "Cancellations & Refunds",
+    "description": "Guest and host cancellation patterns, cancellation timing relative to check-in, refund amounts, policy effectiveness, rebooking after cancellation, and revenue impact",
+    "keywords": ["cancel", "cancellation", "refund", "policy", "booking_update", "status", "declined", "rejected", "no_show", "dispute", "chargeback", "void", "credit", "reschedule"],
+    "priority": 4,
+    "prompt_file": "analysis_cancellation.md"
+  },
+  {
+    "id": "destination",
+    "name": "Destination Performance",
+    "description": "Geographic demand patterns, destination seasonality, market penetration, supply vs demand balance by location, emerging vs mature destinations, and cross-destination guest flow",
+    "keywords": ["destination", "location", "city", "country", "region", "geography", "market", "area", "neighborhood", "supply", "inventory", "occupancy", "penetration", "competition", "emerging"],
+    "priority": 5,
+    "prompt_file": "analysis_destination.md"
+  }
+]

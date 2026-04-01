@@ -1,0 +1,18 @@
+[
+  {
+    "id": "host_performance",
+    "name": "Host Performance",
+    "description": "Host response times, acceptance rates, occupancy rates, listing quality, superhost qualification, and the relationship between host behavior and booking outcomes",
+    "keywords": ["host", "owner", "response", "acceptance", "occupancy", "listing", "superhost", "availability", "property_count", "host_rating", "response_time", "decline", "calendar"],
+    "priority": 4,
+    "prompt_file": "analysis_host_performance.md"
+  },
+  {
+    "id": "guest_satisfaction",
+    "name": "Guest Satisfaction",
+    "description": "Review scores and trends, sentiment patterns, support ticket analysis, complaint categories, and the relationship between satisfaction and rebooking behavior",
+    "keywords": ["review", "rating", "score", "satisfaction", "complaint", "support", "ticket", "sentiment", "feedback", "star", "comment", "issue", "resolution", "nps", "recommend"],
+    "priority": 5,
+    "prompt_file": "analysis_guest_satisfaction.md"
+  }
+]

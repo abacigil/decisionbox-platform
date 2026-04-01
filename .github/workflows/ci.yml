@@ -82,6 +82,7 @@ jobs:
           (cd domain-packs/gaming/go && go test -coverprofile="$COV/gaming.txt" ./...)
           (cd domain-packs/social/go && go test -coverprofile="$COV/social.txt" ./...)
           (cd domain-packs/system-test/go && go test -coverprofile="$COV/system-test.txt" ./...)
+          (cd domain-packs/travel/go && go test -coverprofile="$COV/travel.txt" ./...)
           (cd providers/llm/claude && go test -coverprofile="$COV/llm-claude.txt" ./...)
           (cd providers/llm/openai && go test -coverprofile="$COV/llm-openai.txt" ./...)
           (cd providers/llm/ollama && go test -coverprofile="$COV/llm-ollama.txt" ./...)
@@ -153,6 +154,12 @@ jobs:
         with:
           version: v2.11.3
           working-directory: domain-packs/system-test/go
+
+      - name: Lint travel domain pack
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.3
+          working-directory: domain-packs/travel/go
 
       - name: Lint Databricks warehouse provider
         uses: golangci/golangci-lint-action@v7

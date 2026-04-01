@@ -6,6 +6,7 @@ require (
 	github.com/decisionbox-io/decisionbox/domain-packs/gaming/go v0.0.0
 	github.com/decisionbox-io/decisionbox/domain-packs/social/go v0.0.0
 	github.com/decisionbox-io/decisionbox/domain-packs/system-test/go v0.0.0
+	github.com/decisionbox-io/decisionbox/domain-packs/travel/go v0.0.0
 	github.com/decisionbox-io/decisionbox/libs/go-common v0.0.0
 	github.com/decisionbox-io/decisionbox/providers/llm/azure-foundry v0.0.0
 	github.com/decisionbox-io/decisionbox/providers/llm/bedrock v0.0.0
@@ -224,6 +225,7 @@ replace (
 	github.com/decisionbox-io/decisionbox/domain-packs/gaming/go => ../../domain-packs/gaming/go
 	github.com/decisionbox-io/decisionbox/domain-packs/social/go => ../../domain-packs/social/go
 	github.com/decisionbox-io/decisionbox/domain-packs/system-test/go => ../../domain-packs/system-test/go
+	github.com/decisionbox-io/decisionbox/domain-packs/travel/go => ../../domain-packs/travel/go
 	github.com/decisionbox-io/decisionbox/libs/go-common => ../../libs/go-common
 	github.com/decisionbox-io/decisionbox/providers/llm/azure-foundry => ../../providers/llm/azure-foundry
 	github.com/decisionbox-io/decisionbox/providers/llm/bedrock => ../../providers/llm/bedrock

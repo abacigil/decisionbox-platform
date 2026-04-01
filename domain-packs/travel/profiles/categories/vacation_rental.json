@@ -1,0 +1,65 @@
+{
+  "properties": {
+    "property_types": {
+      "type": "object",
+      "title": "Property Types",
+      "properties": {
+        "types_offered": {
+          "type": "array",
+          "title": "Property Types Offered",
+          "items": { "type": "string", "enum": ["apartment", "house", "villa", "cabin", "cottage", "condo", "townhouse", "loft", "studio", "resort", "hotel_room", "unique_stay", "glamping", "boat", "treehouse"] }
+        },
+        "primary_type": {
+          "type": "string",
+          "title": "Primary Property Type",
+          "description": "Most common property type on the platform"
+        },
+        "avg_bedrooms": { "type": "number", "title": "Avg Bedrooms per Listing" },
+        "avg_max_guests": { "type": "integer", "title": "Avg Max Guests per Listing" }
+      }
+    },
+    "amenities": {
+      "type": "object",
+      "title": "Amenity Tracking",
+      "properties": {
+        "top_amenities": {
+          "type": "array",
+          "title": "Top Amenities",
+          "items": { "type": "string" },
+          "description": "E.g., 'WiFi', 'Pool', 'Kitchen', 'Parking', 'Pet-Friendly', 'Air Conditioning'"
+        },
+        "has_amenity_filtering": { "type": "boolean", "title": "Guests Can Filter by Amenity" },
+        "has_accessibility_features": { "type": "boolean", "title": "Tracks Accessibility Features" }
+      }
+    },
+    "host_program": {
+      "type": "object",
+      "title": "Host Program",
+      "properties": {
+        "has_superhost": { "type": "boolean", "title": "Has Superhost/Premier Program" },
+        "has_co_hosting": { "type": "boolean", "title": "Has Co-Hosting Support" },
+        "has_professional_tools": { "type": "boolean", "title": "Has Professional Host Tools" },
+        "has_host_insurance": { "type": "boolean", "title": "Has Host Protection Insurance" },
+        "host_onboarding": {
+          "type": "string",
+          "title": "Host Onboarding Process",
+          "enum": ["self_service", "guided", "managed", "hybrid"]
+        }
+      }
+    },
+    "seasonal_patterns": {
+      "type": "object",
+      "title": "Seasonal Patterns",
+      "properties": {
+        "peak_months": {
+          "type": "array",
+          "title": "Peak Season Months",
+          "items": { "type": "string", "enum": ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] }
+        },
+        "has_dynamic_pricing": { "type": "boolean", "title": "Has Dynamic/Smart Pricing" },
+        "has_last_minute_deals": { "type": "boolean", "title": "Has Last-Minute Deals" },
+        "has_early_bird_discounts": { "type": "boolean", "title": "Has Early Bird Discounts" }
+      }
+    }
+  }
+}
